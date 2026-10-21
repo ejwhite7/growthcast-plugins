@@ -32,8 +32,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           PLUGIN: ${{ github.event.client_payload.plugin || inputs.plugin }}
         run: |
-          node scripts/sync.mjs $PLUGIN | tee sync.log
-          echo "summary=$(paste -sd ', ' sync.log)" >> "$GITHUB_OUTPUT"
+          node scripts/sync.mjs $PLUGIN | tee "$RUNNER_TEMP/sync.log"
+          echo "summary=$(paste -sd ', ' "$RUNNER_TEMP/sync.log")" >> "$GITHUB_OUTPUT"
       - name: Validate marketplace
         run: npx -y @anthropic-ai/claude-code plugin validate --strict .
       - name: Commit
