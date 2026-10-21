@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.8.2
+- In the client portal, the Staffing tab says the team is saved for the project: new launches in it start with that team, and its launches with no team yet pick it up.
+
 ## 0.8.1
 - Directory listing links: support, privacy policy and terms of service on growthcast.app.
 
