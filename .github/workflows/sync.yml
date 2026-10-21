@@ -1,0 +1,45 @@
+name: Sync plugin releases
+
+on:
+  repository_dispatch:
+    types: [plugin-release]
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: Plugin to sync (blank for all)
+        required: false
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: marketplace-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Pin new plugin versions
+        id: sync
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PLUGIN: ${{ github.event.client_payload.plugin || inputs.plugin }}
+        run: |
+          node scripts/sync.mjs $PLUGIN | tee sync.log
+          echo "summary=$(paste -sd ', ' sync.log)" >> "$GITHUB_OUTPUT"
+      - name: Validate marketplace
+        run: npx -y @anthropic-ai/claude-code plugin validate --strict .
+      - name: Commit
+        run: |
+          git diff --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Release: ${{ steps.sync.outputs.summary }}"
+          git push

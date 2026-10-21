@@ -1,0 +1,47 @@
+{
+  "name": "growthcast",
+  "description": "GrowthCast plugins for Claude Code: GTM and growth tooling.",
+  "owner": {
+    "name": "GrowthCast",
+    "email": "ewhite@growthcast.app",
+    "url": "https://growthcast.app"
+  },
+  "plugins": [
+    {
+      "name": "gtm-positioning",
+      "source": {
+        "source": "github",
+        "repo": "ejwhite7/gtm-positioning",
+        "sha": "e23dcc4b4638199d81fa0a1170ad7a72a51eebc8"
+      },
+      "description": "GTM Positioning by GrowthCast: evidence research, Jobs-to-be-Done, positioning, ICP-specific product marketing guidance, and ad or website copy, with confidence checks that flag evidence gaps.",
+      "version": "1.1.0",
+      "category": "marketing",
+      "homepage": "https://growthcast.app"
+    },
+    {
+      "name": "paid-media-planner",
+      "source": {
+        "source": "github",
+        "repo": "ejwhite7/paid-media-planner",
+        "sha": "8ac743b54cbe72f9d5a4511104638c3586d83c8f"
+      },
+      "description": "Paid Media Campaign Planner by GrowthCast: plan, mock, review and hand off paid media campaigns across eight ad networks.",
+      "version": "1.8.1",
+      "category": "marketing",
+      "homepage": "https://growthcast.app"
+    },
+    {
+      "name": "product-release-checklist",
+      "source": {
+        "source": "github",
+        "repo": "ejwhite7/product-release-checklist",
+        "sha": "4741cc055d63b6e3b6e89b2dd0484547b1907d24"
+      },
+      "description": "Product Release Checklist by GrowthCast: tiered launch system from kickoff to T+90 adoption readout.",
+      "version": "0.7.1",
+      "category": "marketing",
+      "homepage": "https://growthcast.app"
+    }
+  ]
+}
