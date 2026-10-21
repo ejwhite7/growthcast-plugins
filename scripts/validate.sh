@@ -2,7 +2,8 @@
 # Strict marketplace validation that tolerates the directory listing fields in plugin.json
 # (documented, read by Anthropic's directory) when a Claude Code build doesn't know them yet.
 set -uo pipefail
-out=$(npx -y @anthropic-ai/claude-code plugin validate --strict . 2>&1)
+if command -v claude >/dev/null; then cli=(claude); else cli=(npx -y @anthropic-ai/claude-code); fi
+out=$("${cli[@]}" plugin validate --strict . 2>&1)
 status=$?
 echo "$out"
 [ $status -eq 0 ] && exit 0
