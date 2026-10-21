@@ -13,4 +13,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npx -y @anthropic-ai/claude-code plugin validate --strict .
+      - run: scripts/validate.sh

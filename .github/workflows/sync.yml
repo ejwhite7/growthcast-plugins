@@ -35,7 +35,7 @@ jobs:
           node scripts/sync.mjs $PLUGIN | tee "$RUNNER_TEMP/sync.log"
           echo "summary=$(paste -sd ', ' "$RUNNER_TEMP/sync.log")" >> "$GITHUB_OUTPUT"
       - name: Validate marketplace
-        run: npx -y @anthropic-ai/claude-code plugin validate --strict .
+        run: scripts/validate.sh
       - name: Commit
         run: |
           git add -A
