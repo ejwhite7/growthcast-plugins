@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.8.1
+- Directory listing links: support, privacy policy and terms of service on growthcast.app.
+
 ## 0.8.0
 - **Dependencies.** Every checklist item now lists what it waits on, from tiering through the T+90 readout. Change them per launch under **Edit** on any item, custom items included. When an item the launch doesn't have sits in the middle of a chain (another tier, or removed), the dependency passes through to what that item waits on. The checklist shows "waits on N" on open items, flags dependency loops, and warns when an item is due before something it waits on.
 - **Linear "blocked by".** A Linear sync now adds a "blocks" relation for each dependency where both tasks have an issue. Re-syncs reuse existing relations and remove the ones the sync made for dependencies that were later dropped.

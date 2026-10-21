@@ -1,17 +1,17 @@
 {
 	"gtm-positioning": {
 		"repo": "ejwhite7/gtm-positioning",
-		"sha": "ba5dec8643a1adb3ff6d43fad88b6ee74d8486ff",
-		"version": "1.1.1"
+		"sha": "097a1d1fc8fdd592e81cfb223f171eb4159edc78",
+		"version": "1.1.2"
 	},
 	"paid-media-planner": {
 		"repo": "ejwhite7/paid-media-planner",
-		"sha": "a40a67e6c3c15aa4815addc3f9418e2033d0177c",
-		"version": "1.8.2"
+		"sha": "5a7f5d169edf5beba56f424e913e73c4c9f8b3e9",
+		"version": "1.8.3"
 	},
 	"product-release-checklist": {
 		"repo": "ejwhite7/product-release-checklist",
-		"sha": "5f8716185d5fdb1bcd8f62ed97f8084756622320",
-		"version": "0.8.0"
+		"sha": "36d8fb7fd4f8e5fd480b72a8a623ba1bc8911231",
+		"version": "0.8.1"
 	}
 }

@@ -1,7 +1,7 @@
 {
   "name": "gtm-positioning",
   "displayName": "GTM Positioning by GrowthCast",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "GTM Positioning by GrowthCast: evidence research, Jobs-to-be-Done, positioning, ICP-specific product marketing guidance, and ad or website copy, with confidence checks that flag evidence gaps and a local GrowthCast-branded studio.",
   "author": {
     "name": "GrowthCast",
@@ -9,6 +9,9 @@
     "url": "https://growthcast.app"
   },
   "homepage": "https://growthcast.app",
+  "supportUrl": "https://growthcast.app/support",
+  "privacyPolicyUrl": "https://growthcast.app/privacy",
+  "termsOfServiceUrl": "https://growthcast.app/terms",
   "repository": "https://github.com/ejwhite7/gtm-positioning",
   "keywords": [
     "marketing",

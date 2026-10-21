@@ -1,13 +1,16 @@
 {
   "name": "product-release-checklist",
   "displayName": "Product Release Checklist by GrowthCast",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Run product launches in a local studio: tiered, dated checklist; message house; launch assets; adoption measurement; go/no-go readiness; and retro. Ask Claude to fill each step.",
   "author": {
     "name": "GrowthCast",
     "url": "https://growthcast.app"
   },
   "homepage": "https://growthcast.app",
+  "supportUrl": "https://growthcast.app/support",
+  "privacyPolicyUrl": "https://growthcast.app/privacy",
+  "termsOfServiceUrl": "https://growthcast.app/terms",
   "repository": "https://github.com/ejwhite7/product-release-checklist",
   "license": "MIT",
   "keywords": [
