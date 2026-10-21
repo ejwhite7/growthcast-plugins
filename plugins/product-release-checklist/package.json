@@ -1,0 +1,14 @@
+{
+	"name": "product-release-checklist",
+	"version": "0.7.1",
+	"private": true,
+	"type": "module",
+	"description": "Product Release Checklist by GrowthCast: a Claude Code plugin with a local studio for planning, launching and measuring product announcements.",
+	"scripts": {
+		"start": "node tools/studio.mjs --open",
+		"test": "node --test test/*.test.mjs"
+	},
+	"engines": { "node": ">=20" },
+	"license": "MIT",
+	"author": "GrowthCast (https://growthcast.app)"
+}

@@ -1,0 +1,17 @@
+{
+	"gtm-positioning": {
+		"repo": "ejwhite7/gtm-positioning",
+		"sha": "e23dcc4b4638199d81fa0a1170ad7a72a51eebc8",
+		"version": "1.1.0"
+	},
+	"paid-media-planner": {
+		"repo": "ejwhite7/paid-media-planner",
+		"sha": "8ac743b54cbe72f9d5a4511104638c3586d83c8f",
+		"version": "1.8.1"
+	},
+	"product-release-checklist": {
+		"repo": "ejwhite7/product-release-checklist",
+		"sha": "4741cc055d63b6e3b6e89b2dd0484547b1907d24",
+		"version": "0.7.1"
+	}
+}

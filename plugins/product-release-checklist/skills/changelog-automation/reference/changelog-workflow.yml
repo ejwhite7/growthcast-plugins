@@ -1,0 +1,61 @@
+# Template: adapt paths, content format, and the target repo before use.
+name: Changelog draft
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag: { description: "Release tag to draft from", required: true }
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Collect user-facing PRs since previous release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          PREV=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || git rev-list --max-parents=0 HEAD)
+          SINCE=$(git log -1 --format=%cI "$PREV")
+          gh pr list --state merged --label user-facing --search "merged:>=$SINCE -label:changelog:hold" \
+            --json number,title,body,labels,url --limit 200 > prs.json
+          echo "Found $(jq length prs.json) user-facing PRs"
+
+      - name: Rewrite into customer-facing entry
+        if: ${{ hashFiles('prs.json') != '' }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          jq -n --rawfile sys .github/changelog/rewrite-prompt.md --slurpfile prs prs.json --arg tag "$TAG" '{
+            model: "claude-sonnet-5-5",
+            max_tokens: 4000,
+            system: $sys,
+            messages: [{role: "user", content: ("Release " + $tag + "\n\nPRs:\n" + ($prs[0] | tostring))}]
+          }' > req.json
+          curl -sS https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" -d @req.json \
+            | jq -r '.content[0].text' > entry.mdx
+          test -s entry.mdx
+
+      - name: Open PR on marketing site
+        env:
+          GH_TOKEN: ${{ secrets.MARKETING_SITE_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          gh repo clone ORG/marketing-site site -- --depth 1
+          cd site
+          git checkout -b "changelog/$TAG"
+          cp ../entry.mdx "content/changelog/$(date +%F)-$TAG.mdx"
+          git add -A && git -c user.name=changelog-bot -c user.email=bot@users.noreply.github.com commit -m "Changelog: $TAG"
+          git push -u origin HEAD
+          gh pr create --title "Changelog: $TAG" --body "Auto-drafted from release $TAG. PMM review required before merge." --reviewer PMM_GITHUB_HANDLE

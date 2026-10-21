@@ -1,0 +1,24 @@
+{
+  "name": "gtm-positioning",
+  "displayName": "GTM Positioning by GrowthCast",
+  "version": "1.1.0",
+  "description": "GTM Positioning by GrowthCast: evidence research, Jobs-to-be-Done, positioning, ICP-specific product marketing guidance, and ad or website copy, with confidence checks that flag evidence gaps and a local GrowthCast-branded studio.",
+  "author": {
+    "name": "GrowthCast",
+    "email": "ewhite@growthcast.app",
+    "url": "https://growthcast.app"
+  },
+  "homepage": "https://growthcast.app",
+  "repository": "https://github.com/ejwhite7/gtm-positioning",
+  "keywords": [
+    "marketing",
+    "positioning",
+    "jobs-to-be-done",
+    "icp",
+    "copywriting",
+    "product-marketing",
+    "growthcast",
+    "gtm"
+  ],
+  "license": "SEE LICENSE IN LICENSE"
+}

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GTM Positioning</title>
+    <link rel="icon" href="favicon.jpg" />
+    <link rel="stylesheet" href="studio.css" />
+  </head>
+  <body>
+    <header class="siteHeader">
+      <div class="brand">
+        <span class="wordmark">GrowthCast</span>
+        <span class="product">GTM Positioning</span>
+      </div>
+      <nav class="headerNav">
+        <label class="projectPicker">
+          <span>Project</span>
+          <select id="projectSelect"></select>
+        </label>
+        <button class="btn ghost" id="addProjectBtn">Add project</button>
+        <button class="btn" id="newRunBtn">New run</button>
+      </nav>
+    </header>
+
+    <div class="layout">
+      <aside class="runs">
+        <p class="eyebrowLabel">Runs</p>
+        <ul id="runList"></ul>
+        <p class="empty" id="noRuns" hidden>No runs yet. Start one with <b>New run</b>.</p>
+        <div class="contextLink" id="contextLink" hidden>
+          <p class="eyebrowLabel">Shared context</p>
+          <button class="linkBtn" id="openContextBtn">product-marketing-context.md</button>
+        </div>
+      </aside>
+
+      <main id="main">
+        <section class="welcome" id="welcome">
+          <span class="eyebrow">GTM Positioning</span>
+          <h1>From the job customers hire you for, to copy that converts.</h1>
+          <p class="lede">Bring your evidence or let Claude research it, then four modules turn it into strategy and copy. Each module saves a file you review before the next one starts.</p>
+          <ol class="moduleIntro">
+            <li><b>00</b><span>Evidence</span><small>Uploads, links, and web research</small></li>
+            <li><b>01</b><span>Jobs-to-be-Done</span><small>Core jobs, forces of progress, true competition</small></li>
+            <li><b>02</b><span>Positioning</span><small>Alternatives, value, ICP candidates, statements</small></li>
+            <li><b>03</b><span>ICP guidance</span><small>Feature messaging for the ICP you choose</small></li>
+            <li><b>04</b><span>Copy</span><small>Guided ad or website copy briefs</small></li>
+          </ol>
+          <button class="btn large" id="welcomeNewRun">Start a run</button>
+        </section>
+
+        <section class="run" id="runView" hidden>
+          <div class="runHero">
+            <span class="eyebrow" id="runEyebrow">Run</span>
+            <h1 id="runTitle"></h1>
+            <p class="lede" id="runSub"></p>
+          </div>
+          <nav class="stepper" id="stepper"></nav>
+          <div class="module" id="module"></div>
+        </section>
+      </main>
+    </div>
+
+    <footer class="requestBar" id="requestBar" hidden>
+      <div class="requestText">
+        <span class="requestStatus" id="requestStatus"></span>
+        <span id="requestSummary"></span>
+      </div>
+      <div class="requestActions">
+        <button class="btn invert ghost" id="previewRequestBtn">Preview</button>
+        <button class="btn invert" id="clearRequestBtn">Clear</button>
+      </div>
+    </footer>
+
+    <dialog id="dialog">
+      <form method="dialog" id="dialogForm">
+        <h2 id="dialogTitle"></h2>
+        <div id="dialogBody"></div>
+        <div class="dialogActions">
+          <button class="btn ghost" value="cancel" formnovalidate>Cancel</button>
+          <button class="btn" value="ok" id="dialogOk">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" hidden></div>
+    <script src="md.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

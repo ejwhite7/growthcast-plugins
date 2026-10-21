@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<title>Product Release Checklist · GrowthCast</title>
+	<link rel="icon" href="favicon.jpg">
+	<link rel="stylesheet" href="tokens.css">
+	<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+	<header class="top">
+		<button id="toggleLeft" class="icon-btn" title="Hide the left panel ( [ )" aria-pressed="true">◧</button>
+		<a class="logo" href="#portfolio" title="All launches"><span class="wordmark">GrowthCast</span><span class="product">Product Release Checklist</span></a>
+		<select id="launchSel" title="Open a launch"></select>
+		<button id="newLaunch" title="New launch">New</button>
+		<input id="launchName" aria-label="Launch name" data-bind="name">
+		<select id="launchStatus" title="Launch status" data-bind="status" data-rerender></select>
+		<span class="grow"></span>
+		<span id="saveState" class="muted small"></span>
+		<button id="settingsBtn" title="Company context file, export folder">Settings</button>
+		<button id="shareBtn" class="primary">Share</button>
+	</header>
+	<nav class="tabs" id="tabs"></nav>
+	<main>
+		<aside class="left">
+			<h4>Ask Claude</h4>
+			<textarea id="askNote" rows="4" placeholder="Paste a PRD link or describe the launch, or say what to focus on."></textarea>
+			<div class="ask-btns" id="askBtns"></div>
+			<div id="askState" class="ask-state" hidden></div>
+			<h4>Checks</h4>
+			<div id="checks"></div>
+		</aside>
+		<section id="stage"></section>
+	</main>
+	<dialog id="dlg"></dialog>
+	<div id="toast" role="status"></div>
+	<script type="module" src="app.js"></script>
+</body>
+</html>

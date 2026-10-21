@@ -1,0 +1,21 @@
+{
+  "name": "gtm-positioning",
+  "version": "1.1.0",
+  "description": "GTM Positioning by GrowthCast: evidence research, Jobs-to-be-Done, positioning, ICP-specific product marketing guidance, and ad or website copy, with confidence checks that flag evidence gaps and a local GrowthCast-branded studio.",
+  "type": "module",
+  "keywords": [
+    "pi-package"
+  ],
+  "license": "SEE LICENSE IN LICENSE",
+  "pi": {
+    "extensions": [
+      "./extensions/positioning-workshop.ts"
+    ],
+    "skills": [
+      "./skills/positioning-statement"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}
