@@ -1,13 +1,13 @@
 {
 	"gtm-positioning": {
 		"repo": "ejwhite7/gtm-positioning",
-		"sha": "e23dcc4b4638199d81fa0a1170ad7a72a51eebc8",
-		"version": "1.1.0"
+		"sha": "ba5dec8643a1adb3ff6d43fad88b6ee74d8486ff",
+		"version": "1.1.1"
 	},
 	"paid-media-planner": {
 		"repo": "ejwhite7/paid-media-planner",
-		"sha": "8ac743b54cbe72f9d5a4511104638c3586d83c8f",
-		"version": "1.8.1"
+		"sha": "a40a67e6c3c15aa4815addc3f9418e2033d0177c",
+		"version": "1.8.2"
 	},
 	"product-release-checklist": {
 		"repo": "ejwhite7/product-release-checklist",

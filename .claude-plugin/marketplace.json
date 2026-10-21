@@ -11,7 +11,7 @@
       "name": "gtm-positioning",
       "source": "./plugins/gtm-positioning",
       "description": "GTM Positioning by GrowthCast: evidence research, Jobs-to-be-Done, positioning, ICP-specific product marketing guidance, and ad or website copy, with confidence checks that flag evidence gaps.",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "category": "marketing",
       "homepage": "https://growthcast.app"
     },
@@ -19,7 +19,7 @@
       "name": "paid-media-planner",
       "source": "./plugins/paid-media-planner",
       "description": "Paid Media Campaign Planner by GrowthCast: plan, mock, review and hand off paid media campaigns across eight ad networks.",
-      "version": "1.8.1",
+      "version": "1.8.2",
       "category": "marketing",
       "homepage": "https://growthcast.app"
     },
