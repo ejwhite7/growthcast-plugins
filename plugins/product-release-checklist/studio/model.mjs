@@ -120,7 +120,8 @@ export const ITEMS = [
 	I("build", "video-production", [1, 2], "CONTENT", -9, "Video production: screen capture, founder takes, AI shots, voiceover, music licensed for paid use"),
 	I("build", "video-review", [1, 2], "PMM", -6, "Video review closed: PMM, founder and legal signed off on the cut (2 rounds max)"),
 	I("build", "video-final", [1, 2], "CONTENT", -5, "Video master approved and archived with project files and licenses", { gate: 1 }),
-	I("build", "video-cutdowns", [1, 2], "CONTENT", -4, "Video cutdowns and captions: vertical, square, in-app loop, paid cuts, SRT files, thumbnails"),
+	I("build", "video-cutdowns", [1, 2], "CONTENT", -4, "Video cutdowns and captions: vertical, square, in-app loop, paid cuts, SRT files"),
+	I("build", "video-thumbnail", [1, 2], "DESIGN", -4, "Launch video thumbnail: 1280×720, the outcome plus 3–5 words of text, readable at phone size, 2 options with one picked, cover frames for the vertical and square cuts"),
 	I("build", "video-handoff", [1, 2], "CONTENT", -3, "Video hand-off packet sent to social, paid, web, support and CS, each with files, captions and specs (Video tab)"),
 	I("build", "teaser-motion", [1, 2], "DESIGN", -4, "Pre-launch teaser motion graphic (optional)"),
 	I("build", "teaser-post", [1, 2], "SOCIAL", -2, "Teaser post scheduled to go out at T-2"),
@@ -167,6 +168,7 @@ export const ITEMS = [
 	I("launch", "flag-live", [1, 2, 3], "ENG", 0, "Feature live for the announced audience before anything public goes out"),
 	I("launch", "vip-notify", [1], "CS", 0, "Key accounts and feature requesters told personally, 1 hour before public"),
 	I("launch", "social-sequence", [1, 2], "SOCIAL", 0, "Founder post → company post → employee advocacy, within 60 minutes"),
+	I("launch", "youtube-launch-video", [1, 2], "CONTENT", 0, "Launch video on YouTube: hero cut uploaded unlisted by T-1, public at T-0. Search-intent title, description with UTM links, chapters, SRT captions, the chosen thumbnail, end screen, pinned comment, added to the launch playlist; link sent to web, KB and CS"),
 	I("launch", "publish-owned", [1, 2], "PMM", 0, "Announcement published; in-app and site banner on; email sent"),
 	I("launch", "publish-docs", [1, 2, 3], "PM", 0, "Changelog published; KB live; support pack posted to support"),
 	I("launch", "paid-launch-campaign", [1, 2], "PAID", 0, "Launch campaign live with the launch ad creative, one ad set per audience: Prospects (all, minus engaged audiences and customers), Warm engagers (engaged audiences, minus users), Users (current users), Churned (former users), each excluding users who have adopted the feature. Objective: custom conversion on the first step of feature usage. Announcement video boosted to warm engagers first"),
@@ -187,7 +189,152 @@ export const ITEMS = [
 	I("measure", "t30", [1, 2], "DATA", 30, "T+30 readout: activation, holdout lift, channels, guardrails, support load"),
 	I("measure", "t90", [1], "DATA", 90, "T+90 readout: retention and revenue impact; double down, iterate or sunset"),
 ];
+// What each item waits on: the items that must be done first. A Linear sync turns each pair into a "blocks" relation.
+// Per launch, `items.<id>.after` (or a custom item's `after`) replaces the default list.
+export const AFTER = {
+	calendar: ["tier"],
+	packaging: ["eligibility"],
+	"rollout-plan": ["eligibility"],
+	baseline: ["metric"],
+	holdout: ["metric"],
+
+	"message-house": ["tier", "eligibility", "packaging", "evidence", "name", "founder-angle"],
+	claims: ["message-house"],
+	"video-brief": ["tier"],
+	"video-script": ["video-brief", "message-house"],
+
+	"founder-post": ["message-house", "founder-angle"],
+	"video-production": ["video-script", "ui-freeze"],
+	"video-review": ["video-production", "claims"],
+	"video-final": ["video-review"],
+	"video-cutdowns": ["video-final"],
+	"video-thumbnail": ["video-final"],
+	"video-handoff": ["video-cutdowns", "video-thumbnail"],
+	"teaser-motion": ["message-house", "ui-freeze"],
+	"teaser-post": ["teaser-motion"],
+	"paid-handoff": ["video-cutdowns", "founder-post", "landing-page"],
+	"landing-page": ["message-house", "ui-freeze"],
+	banner: ["landing-page"],
+	changelog: ["message-house"],
+	"social-founder": ["founder-post"],
+	"social-company": ["message-house"],
+	"employee-kit": ["social-company"],
+	creators: ["message-house"],
+	community: ["message-house"],
+	"in-app": ["message-house", "eligibility"],
+	"first-run": ["ui-freeze"],
+	mobile: ["message-house", "ui-freeze"],
+	kb: ["message-house", "ui-freeze"],
+	"kb-bot": ["kb"],
+	youtube: ["message-house", "ui-freeze"],
+	webinar: ["message-house"],
+	localization: ["in-app", "email-announce", "nonadopter"],
+	audiences: ["eligibility"],
+	"paid-creative": ["message-house", "claims"],
+	"paid-budget": ["audiences"],
+	search: ["message-house", "landing-page"],
+	"email-announce": ["message-house", "eligibility"],
+	nonadopter: ["email-announce", "events"],
+	"upgrade-path": ["packaging", "email-announce"],
+	winback: ["email-announce"],
+	collision: ["email-announce", "nonadopter", "upgrade-path", "winback"],
+	"support-pack": ["message-house", "kb"],
+	"cs-pack": ["message-house"],
+	partners: ["message-house"],
+	press: ["message-house", "evidence"],
+	internal: ["support-pack", "cs-pack"],
+	events: ["metric"],
+	dashboard: ["metric", "events"],
+	utms: ["landing-page", "in-app", "email-announce"],
+
+	readiness: ["message-house", "video-final", "kb", "support-pack", "events", "rollout-ready", "rollback-comms"],
+	"rollout-ready": ["rollout-plan", "events"],
+	"rollback-comms": ["message-house"],
+	"run-of-show": ["dri"],
+
+	"flag-live": ["readiness", "rollout-ready"],
+	"vip-notify": ["flag-live", "requesters", "cs-pack"],
+	"social-sequence": ["flag-live", "social-founder", "social-company", "employee-kit", "video-handoff"],
+	"youtube-launch-video": ["flag-live", "video-cutdowns", "video-thumbnail"],
+	"publish-owned": ["flag-live", "founder-post", "landing-page", "banner", "in-app", "email-announce", "collision"],
+	"publish-docs": ["flag-live", "changelog", "kb", "support-pack"],
+	"paid-launch-campaign": ["flag-live", "audiences", "paid-creative", "paid-budget", "paid-handoff"],
+	"war-room": ["flag-live", "run-of-show", "dashboard"],
+
+	replies: ["social-sequence"],
+	"feedback-prompt": ["flag-live"],
+	"lifecycle-check": ["publish-owned", "nonadopter"],
+	"ticket-review": ["publish-docs"],
+	"video-performance": ["youtube-launch-video", "social-sequence", "paid-launch-campaign"],
+	"webinar-held": ["webinar"],
+	"creator-waves": ["creators", "flag-live"],
+	"second-wave": ["evidence", "publish-owned"],
+	"retire-banners": ["publish-owned"],
+
+	t7: ["flag-live", "dashboard"],
+	retro: ["t7"],
+	t30: ["t7"],
+	t90: ["t30"],
+};
+for (const i of ITEMS) i.after = AFTER[i.id] ?? [];
 export const itemById = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
+
+// The launch context a task carries to Linear, beyond the overview every task gets. Each block pulls from the brief or
+// the message house; empty blocks are left out. Defaults come from the item's role, `CTX_ITEMS` overrides them, and
+// `items.<id>.ctx` (or a custom item's `ctx`) overrides both for one launch.
+export const CTX_BLOCKS = [
+	["pillars", "Pillars and proof"],
+	["audience", "Who it's for, before and after"],
+	["words", "Words to use and avoid"],
+	["ctas", "CTAs by audience"],
+	["objections", "Objections and answers"],
+	["limits", "Limits"],
+	["eligibility", "Eligibility and pricing"],
+	["quotes", "Customer quotes"],
+	["metric", "Success metric"],
+	["video", "Video brief"],
+];
+export const CTX_ROLES = {
+	DRI: [],
+	PMM: ["pillars", "audience", "words", "objections", "limits"],
+	PM: ["audience", "eligibility", "limits"],
+	ENG: ["eligibility", "metric"],
+	DESIGN: ["pillars", "audience", "words"],
+	WEB: ["pillars", "audience", "words", "ctas"],
+	CONTENT: ["pillars", "audience", "words"],
+	SOCIAL: ["pillars", "words", "ctas", "quotes"],
+	PAID: ["pillars", "audience", "ctas", "eligibility"],
+	LIFECYCLE: ["audience", "words", "ctas", "eligibility"],
+	SUPPORT: ["eligibility", "objections", "limits"],
+	CS: ["pillars", "objections", "limits", "ctas"],
+	DATA: ["metric"],
+	LEGAL: ["pillars", "quotes", "limits"],
+	FOUNDER: ["pillars", "audience"],
+};
+export const CTX_ITEMS = {
+	"video-brief": ["pillars", "audience", "video"],
+	"video-script": ["pillars", "audience", "words", "video"],
+	"video-production": ["video", "words"],
+	"video-review": ["pillars", "words", "limits", "video"],
+	"video-final": ["video"],
+	"video-cutdowns": ["video", "ctas"],
+	"video-thumbnail": ["pillars", "words", "video"],
+	"video-handoff": ["video", "ctas"],
+	"youtube-launch-video": ["pillars", "words", "ctas", "video"],
+	"video-performance": ["metric", "video"],
+	"teaser-motion": ["pillars", "words"],
+	"ui-freeze": ["eligibility"],
+	claims: ["pillars", "quotes", "limits"],
+	press: ["pillars", "audience", "quotes"],
+	"rollout-plan": ["eligibility"],
+	"rollback-comms": ["limits", "eligibility"],
+	"vip-notify": ["pillars", "ctas", "quotes"],
+	"feedback-prompt": ["metric", "audience"],
+	"second-wave": ["pillars", "quotes"],
+	internal: ["pillars", "audience", "objections", "limits"],
+	events: ["metric"],
+};
+export const ctxDefault = (id, role) => CTX_ITEMS[id] ?? CTX_ROLES[role] ?? [];
 
 // --- Dates (ISO yyyy-mm-dd, computed in UTC so they never shift with the timezone) ---
 const D = (iso) => new Date(`${iso}T00:00:00Z`);
@@ -253,6 +400,10 @@ export function normalize(raw) {
 	const m = r.message ?? {};
 	const me = r.measure ?? {};
 	const items = {};
+	const customIds = new Set(arr(r.custom).map((c) => c?.id).filter(Boolean));
+	// Dependencies name other items (default or custom), never the item itself.
+	const ids = (list, self) => [...new Set(list.filter((x) => typeof x === "string" && x !== self && (itemById[x] || customIds.has(x))))].slice(0, 30);
+	const ctxKeys = (list) => [...new Set(list.filter((x) => CTX_BLOCKS.some(([k]) => k === x)))];
 	const rawItems = { ...(r.items ?? {}) };
 	if (rawItems.video && !rawItems["video-final"]) rawItems["video-final"] = rawItems.video;
 	for (const [k, v] of Object.entries(rawItems)) {
@@ -264,7 +415,10 @@ export function normalize(raw) {
 			if (ROLES.includes(v?.role)) items[k].role = v.role;
 			if (PHASES.some((p) => p.id === v?.phase)) items[k].phase = v.phase;
 			if (v?.removed === true) items[k].removed = true;
+			if (Array.isArray(v?.after)) items[k].after = ids(v.after, k);
+			if (Array.isArray(v?.ctx)) items[k].ctx = ctxKeys(v.ctx);
 		}
+		if (str(v?.context, 2000).trim()) items[k].context = str(v.context, 2000).trim();
 	}
 	const assets = {};
 	for (const [k, v] of Object.entries(r.assets ?? {})) {
@@ -284,6 +438,8 @@ export function normalize(raw) {
 		status: oneOf(r.status, LAUNCH_STATUS, "planning"),
 		t0: validDate(r.t0) ? r.t0 : addDays(today(), 35),
 		dri: str(r.dri, 120),
+		// The overview every task carries to Linear. Empty means the message house one-liner (or the brief's first line).
+		context: str(r.context, 2000),
 		rollout: { full: r.rollout?.full === false ? false : r.rollout?.full === true ? true : null, note: str(r.rollout?.note, 1000) },
 		brief: {
 			description: str(b.description, 6000),
@@ -302,7 +458,7 @@ export function normalize(raw) {
 		},
 		tier: { scores, reasons, override: [1, 2, 3].includes(t.override) ? t.override : null, overrideReason: str(t.overrideReason, 1000) },
 		items,
-		custom: arr(r.custom).filter((c) => c && c.id && c.text).map((c) => ({ id: str(c.id, 64), phase: PHASES.some((p) => p.id === c.phase) ? c.phase : "build", text: str(c.text, 400), role: ROLES.includes(c.role) ? c.role : "DRI", due: Number.isInteger(c.due) ? c.due : -5 })),
+		custom: arr(r.custom).filter((c) => c && c.id && c.text).map((c) => ({ id: str(c.id, 64), phase: PHASES.some((p) => p.id === c.phase) ? c.phase : "build", text: str(c.text, 400), role: ROLES.includes(c.role) ? c.role : "DRI", due: Number.isInteger(c.due) ? c.due : -5, after: ids(arr(c.after), c.id), ...(Array.isArray(c.ctx) ? { ctx: ctxKeys(c.ctx) } : {}) })),
 		message: {
 			status: m.status === "approved" ? "approved" : "draft",
 			approvedAt: str(m.approvedAt, 40),
@@ -381,7 +537,10 @@ function normalizeLinear(x) {
 	for (const [k, v] of Object.entries(o.issues ?? {})) if (v?.id) issues[str(k, 64)] = { id: str(v.id, 64), identifier: str(v.identifier, 40), url: str(v.url, 400), state: str(v.state, 40), syncedAt: str(v.syncedAt, 40) };
 	const milestones = {};
 	for (const [k, v] of Object.entries(o.milestones ?? {})) if (PHASES.some((p) => p.id === k) && v) milestones[k] = str(v, 64);
-	return { teamId: str(o.teamId, 64), teamName: str(o.teamName, 120), projectId: str(o.projectId, 64), projectUrl: str(o.projectUrl, 400), syncedAt: str(o.syncedAt, 40), pulledAt: str(o.pulledAt, 40), milestones, issues };
+	// "<blocker key>><blocked key>" → the Linear relation id the sync made for that dependency.
+	const relations = {};
+	for (const [k, v] of Object.entries(o.relations ?? {})) if (/^[^>]+>[^>]+$/.test(k) && v) relations[str(k, 140)] = str(v, 64);
+	return { teamId: str(o.teamId, 64), teamName: str(o.teamName, 120), projectId: str(o.projectId, 64), projectUrl: str(o.projectUrl, 400), syncedAt: str(o.syncedAt, 40), pulledAt: str(o.pulledAt, 40), milestones, issues, relations };
 }
 
 // --- Derived values ---
@@ -405,12 +564,80 @@ export function ownerOf(l, role, owner = "") {
 	return personById(l, l.staffing[role]);
 }
 
+// An item's own dependency list for this launch: the launch's edit, else the default.
+export const afterOf = (l, id) => {
+	const c = l.custom.find((x) => x.id === id);
+	return c ? c.after : Array.isArray(l.items[id]?.after) ? l.items[id].after : (itemById[id]?.after ?? []);
+};
+export const ctxOf = (l, id) => {
+	const c = l.custom.find((x) => x.id === id);
+	const own = c ? c.ctx : l.items[id]?.ctx;
+	return Array.isArray(own) ? own : ctxDefault(id, l.items[id]?.role || c?.role || itemById[id]?.role);
+};
+// Dependencies on items this launch doesn't have (another tier, or removed) pass through to what those items wait on,
+// so the chain never breaks. Returns the direct ones and the passed-through ones separately.
+function resolveAfter(l, id, present, seen = new Set([id]), depth = 0) {
+	const direct = [];
+	const through = [];
+	for (const p of afterOf(l, id)) {
+		if (seen.has(p)) continue;
+		seen.add(p);
+		if (present.has(p)) (depth ? through : direct).push(p);
+		else through.push(...resolveAfter(l, p, present, seen, depth + 1).all);
+	}
+	return { direct, through: through.filter((p) => !direct.includes(p)), all: [...new Set([...direct, ...through])] };
+}
+// A dependency loop in this launch, as a list of item ids, or null.
+export function dependencyCycle(l, override = {}) {
+	const after = (id) => override[id] ?? afterOf(l, id);
+	const all = [...ITEMS.map((i) => i.id), ...l.custom.map((c) => c.id)];
+	const state = {};
+	const visit = (id, path) => {
+		if (state[id] === 2) return null;
+		if (state[id] === 1) return [...path.slice(path.indexOf(id)), id];
+		state[id] = 1;
+		for (const p of after(id)) {
+			const loop = visit(p, [...path, id]);
+			if (loop) return loop;
+		}
+		state[id] = 2;
+		return null;
+	};
+	for (const id of all) {
+		const loop = visit(id, []);
+		if (loop) return loop;
+	}
+	return null;
+}
+
 export function itemsFor(l) {
 	const tier = effectiveTier(l);
 	const custom = l.custom.map((c) => ({ ...c, tiers: [1, 2, 3], custom: true }));
-	return [...ITEMS, ...custom]
+	const list = [...ITEMS, ...custom]
 		// Gates can't be removed: waive them instead, with a reason.
-		.filter((i) => i.tiers.includes(tier) && !(l.items[i.id]?.removed && !(i.gate === true || (i.gate === 1 && tier === 1))))
+		.filter((i) => i.tiers.includes(tier) && !(l.items[i.id]?.removed && !(i.gate === true || (i.gate === 1 && tier === 1))));
+	const present = new Set(list.map((i) => i.id));
+	const resolved = Object.fromEntries(list.map((i) => [i.id, resolveAfter(l, i.id, present)]));
+	// A passed-through dependency that another dependency already waits on is redundant, so it's dropped.
+	const memo = {};
+	const ancestors = (id, path = new Set()) => {
+		if (memo[id]) return memo[id];
+		if (path.has(id)) return new Set();
+		path.add(id);
+		const a = new Set();
+		for (const p of resolved[id]?.all ?? []) {
+			a.add(p);
+			for (const x of ancestors(p, path)) a.add(x);
+		}
+		path.delete(id);
+		return (memo[id] = a);
+	};
+	const afterIn = (id) => {
+		const { direct, through } = resolved[id];
+		const kept = [...direct, ...new Set(through)];
+		return kept.filter((p) => direct.includes(p) || !kept.some((q) => q !== p && ancestors(q).has(p)));
+	};
+	const out = list
 		.map((i) => {
 			const st = l.items[i.id] ?? { status: "todo", owner: "", due: "", evidence: "", note: "" };
 			const planned = weekday(addDays(l.t0, i.due), i.due > 0);
@@ -418,10 +645,17 @@ export function itemsFor(l) {
 			const open = !["done", "waived", "na"].includes(st.status);
 			const gate = i.gate === true || (i.gate === 1 && tier === 1);
 			const person = ownerOf(l, st.role || i.role, st.owner);
-			const { removed, ...edits } = st;
-			return { ...i, ...edits, def: i, edited: !!(st.text || st.role || st.phase), gate, planned, due, open, overdue: open && due < today(), person, ownerName: person?.name || st.owner || "", issue: l.sync.linear.issues[i.id] ?? null };
+			const { removed, after: _after, ctx: _ctx, ...edits } = st;
+			return { ...i, ...edits, def: i, edited: !!(st.text || st.role || st.phase || st.after || st.ctx), gate, planned, due, open, overdue: open && due < today(), person, ownerName: person?.name || st.owner || "", issue: l.sync.linear.issues[i.id] ?? null, after: afterIn(i.id), ctx: ctxOf(l, i.id), context: st.context || i.context || "" };
 		})
 		.sort((a, b) => PHASES.findIndex((p) => p.id === a.phase) - PHASES.findIndex((p) => p.id === b.phase) || a.due.localeCompare(b.due));
+	// What each item still waits on (open dependencies) and what it blocks.
+	const byId = Object.fromEntries(out.map((i) => [i.id, i]));
+	for (const i of out) {
+		i.waitingOn = i.after.filter((p) => byId[p]?.open);
+		i.blocks = out.filter((x) => x.after.includes(i.id)).map((x) => x.id);
+	}
+	return out;
 }
 export const assetsFor = (l) => ASSETS.filter((a) => a.tiers.includes(effectiveTier(l))).map((a) => ({ ...a, ...(l.assets[a.id] ?? { status: "todo", owner: "", link: "", body: "" }) }));
 
@@ -440,6 +674,14 @@ export function checks(l, others = []) {
 	const tier = tierOf(l);
 	const days = daysBetween(today(), l.t0);
 	if (!tier) add("warn", "Brief", "Score the tier. Until then the checklist shows every T1 item.");
+	const loop = dependencyCycle(l);
+	if (loop) add("error", "Checklist", `Dependency loop: ${loop.join(" → ")}. Remove one of these dependencies.`, loop[0]);
+	const listed = itemsFor(l);
+	const byId = Object.fromEntries(listed.map((i) => [i.id, i]));
+	for (const i of listed) {
+		const late = i.open ? i.after.filter((p) => byId[p].open && byId[p].due > i.due) : [];
+		if (late.length) add("warn", "Checklist", `“${i.text.slice(0, 60)}” is due ${fmtDate(i.due)}, before ${late.map((p) => `“${byId[p].text.slice(0, 40)}” (${fmtDate(byId[p].due)})`).join(", ")}, which it waits on.`, i.id);
+	}
 	if (!l.dri.trim()) add("error", "Brief", "No launch DRI. One person has to own the launch.");
 	else if (/founder|ceo/i.test(l.dri)) add("warn", "Brief", "The DRI looks like the founder. Founders approve; someone else should run the launch.");
 	if (l.rollout.full === false) add("error", "Brief", "Rollout won't reach 100% of the announced audience by T-0. Narrow the announcement or move the date.", "rollout-plan");

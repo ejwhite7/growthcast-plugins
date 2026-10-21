@@ -1,6 +1,6 @@
 // The team-facing launch plan (who does what, by when) as a presentable page and a tasks CSV, and the Linear sync
 // payload: the project, one milestone per phase, and one issue per open checklist item assigned to its owner.
-import { ASSETS, PHASES, ROLE_INFO, TIERS, fmtDate, itemsFor, readiness, tLabel, daysBetween, tierOf, workload, VERDICT } from "./model.mjs";
+import { ASSETS, CTX_BLOCKS, PHASES, ROLE_INFO, TIERS, fmtDate, itemsFor, readiness, tLabel, daysBetween, tierOf, workload, VERDICT } from "./model.mjs";
 import { esc } from "./report.mjs";
 
 const phaseLabel = (id) => PHASES.find((p) => p.id === id)?.label ?? id;
@@ -107,8 +107,8 @@ for (const box of document.querySelectorAll("[data-check]:not([disabled])")) {
 
 const csvCell = (v) => (/[",\n]/.test(String(v ?? "")) ? `"${String(v).replace(/"/g, '""')}"` : String(v ?? ""));
 export function renderTasksCsv(l) {
-	const rows = [["Owner", "Email", "Role", "Phase", "Task", "Due", "T-offset", "Status", "Gate", "Linear issue"]];
-	for (const i of itemsFor(l)) rows.push([i.person?.name ?? i.owner ?? "", i.person?.email ?? "", i.role, phaseLabel(i.phase), i.text, i.due, tLabel(daysBetween(l.t0, i.due)), i.status, i.gate ? "yes" : "", i.issue?.url ?? ""]);
+	const rows = [["Owner", "Email", "Role", "Phase", "Task", "Due", "T-offset", "Status", "Gate", "Linear issue", "Task id", "Waits on"]];
+	for (const i of itemsFor(l)) rows.push([i.person?.name ?? i.owner ?? "", i.person?.email ?? "", i.role, phaseLabel(i.phase), i.text, i.due, tLabel(daysBetween(l.t0, i.due)), i.status, i.gate ? "yes" : "", i.issue?.url ?? "", i.id, i.after.join(" ")]);
 	return rows.map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
 }
 
@@ -132,7 +132,58 @@ ${w.unassigned.length ? `\n### Unassigned\n${w.unassigned.map(line).join("\n")}`
 `;
 }
 
+// --- Task context ---
+// The overview every task carries, then the brief and message-house blocks chosen for the task (empty ones left out).
+export const launchOverview = (l) => l.context.trim() || l.message.oneLiner || firstSentence(l.brief.description);
+const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+const CTX_RENDER = {
+	pillars: (l) => l.message.pillars.filter((p) => p.claim).map((p) => `- ${p.claim}${p.proof ? ` (proof: ${clip(p.proof, 300)})` : ""}`).join("\n"),
+	audience: (l) => [l.message.forWho && `**For:** ${l.message.forWho}`, l.message.notFor && `**Not for:** ${l.message.notFor}`, l.message.before && `**Before:** ${l.message.before}`, l.message.after && `**After:** ${l.message.after}`].filter(Boolean).join("\n"),
+	words: (l) => [l.message.useWords && `**Use:** ${l.message.useWords}`, l.message.avoidWords && `**Avoid:** ${l.message.avoidWords}`].filter(Boolean).join("\n"),
+	ctas: (l) => [["prospect", "Prospects"], ["customer", "Eligible customers"], ["ineligible", "Ineligible plan"], ["churned", "Churned"]].filter(([k]) => l.message.ctas[k]).map(([k, label]) => `- ${label}: ${l.message.ctas[k]}`).join("\n"),
+	objections: (l) => l.message.objections.filter((o) => o.q).slice(0, 6).map((o) => `- **${o.q}** ${clip(o.a, 300)}`).join("\n"),
+	limits: (l) => clip(l.message.limits, 800),
+	eligibility: (l) => [l.brief.plans && `**Plans:** ${l.brief.plans}`, l.brief.platforms && `**Platforms:** ${l.brief.platforms}`, l.brief.regions && `**Regions:** ${l.brief.regions}`, l.brief.pricing && `**Pricing:** ${clip(l.brief.pricing, 300)}`].filter(Boolean).join("\n"),
+	quotes: (l) => clip(l.message.quotes, 800),
+	metric: (l) => [l.measure.primary && `**Primary:** ${l.measure.primary}`, l.measure.activation && `**Activation:** ${l.measure.activation}`, l.measure.window && l.measure.primary ? `**Window:** ${l.measure.window}` : ""].filter(Boolean).join("\n"),
+	video: (l) => [l.video.format && `**Format:** ${l.video.format}`, l.video.length && `**Length:** ${l.video.length}`, l.video.hook && `**Hook:** ${l.video.hook}`].filter(Boolean).join("\n"),
+};
+export function taskContext(l, i) {
+	const draft = l.message.status !== "approved" && i.ctx.some((k) => !["eligibility", "metric", "video"].includes(k));
+	const blocks = i.ctx.map((k) => [CTX_BLOCKS.find(([b]) => b === k)?.[1], CTX_RENDER[k]?.(l)]).filter(([label, body]) => label && body);
+	return [
+		launchOverview(l) ? `**What we're launching:** ${launchOverview(l)}` : "",
+		i.context ? `**For this task:** ${i.context}` : "",
+		...blocks.map(([label, body]) => `**${label}**\n${body}`),
+		blocks.length && draft ? "_The message house isn't approved yet, so this may change._" : "",
+	].filter(Boolean);
+}
+
 // --- Linear ---
+// The issue body: the task, what it waits on and blocks, then its context.
+export function issueDescription(l, i, { studioUrl = "", items = itemsFor(l) } = {}) {
+	const byId = Object.fromEntries(items.map((x) => [x.id, x]));
+	const assetFor = Object.fromEntries(ASSETS.filter((a) => a.item).map((a) => [a.item, a]));
+	const name = (id) => {
+		const x = byId[id];
+		return x ? `${x.issue?.identifier ? `${x.issue.identifier} ` : ""}${clip(x.text, 80)}${x.open ? "" : " (done)"}` : id;
+	};
+	const ctx = taskContext(l, i);
+	return [
+		`**Launch:** ${l.name} · T-0 ${fmtDate(l.t0)}${tierOf(l) ? ` · T${tierOf(l)}` : ""}`,
+		`**Phase:** ${phaseLabel(i.phase)} · **Role:** ${i.role} · **Due:** ${fmtDate(i.due)} (${tLabel(daysBetween(l.t0, i.due))})`,
+		i.gate ? "**Go/no-go gate.** The launch can't go ahead until this is done." : "",
+		assetFor[i.id] ? `**Deliverable:** ${assetFor[i.id].label}. ${assetFor[i.id].spec}` : "",
+		i.after.length ? `**Waits on:**\n${i.after.map((id) => `- ${name(id)}`).join("\n")}` : "",
+		i.blocks.length ? `**Blocks:**\n${i.blocks.map((id) => `- ${name(id)}`).join("\n")}` : "",
+		i.note ? `**Note:** ${i.note}` : "",
+		ctx.length ? `---\n\n### Context\n\n${ctx.join("\n\n")}` : "",
+		`---\n\n**Done:** close this issue. Closing it ticks the task off in the release checklist.${studioUrl ? ` [Open the launch](${studioUrl})` : ""}`,
+	]
+		.filter(Boolean)
+		.join("\n\n");
+}
+
 // Everything Claude needs to create or update the Linear project through Composio, plus what's already linked.
 export function linearPayload(l, { studioUrl = "" } = {}) {
 	const items = itemsFor(l);
@@ -140,19 +191,9 @@ export function linearPayload(l, { studioUrl = "" } = {}) {
 	const sync = l.sync.linear;
 	const w = workload(l);
 	const lead = w.people.find((p) => p.roles.includes("DRI"));
-	const assetFor = Object.fromEntries(ASSETS.filter((a) => a.item).map((a) => [a.item, a]));
-	const describe = (i) =>
-		[
-			`**Launch:** ${l.name} · T-0 ${fmtDate(l.t0)}${tierOf(l) ? ` · T${tierOf(l)}` : ""}`,
-			`**Phase:** ${phaseLabel(i.phase)} · **Role:** ${i.role} · **Due:** ${fmtDate(i.due)} (${tLabel(daysBetween(l.t0, i.due))})`,
-			i.gate ? "**Go/no-go gate.** The launch can't go ahead until this is done." : "",
-			assetFor[i.id] ? `**Deliverable:** ${assetFor[i.id].label}. ${assetFor[i.id].spec}` : "",
-			i.note ? `**Note:** ${i.note}` : "",
-			`**Done:** close this issue. Closing it ticks the task off in the release checklist.`,
-			l.message.oneLiner ? `> ${l.message.oneLiner}` : "",
-		]
-			.filter(Boolean)
-			.join("\n\n");
+	const describe = (i) => issueDescription(l, i, { studioUrl, items });
+	const synced = items.filter((i) => i.open || sync.issues[i.id]);
+	const inLinear = new Set(synced.map((i) => i.id));
 	return {
 		launchId: l.id,
 		team: { id: sync.teamId, name: sync.teamName },
@@ -166,9 +207,7 @@ export function linearPayload(l, { studioUrl = "" } = {}) {
 		},
 		milestones: windows.map((p, n) => ({ phase: p.id, name: `${n + 1}. ${p.label}`, target_date: p.to, existingId: sync.milestones[p.id] ?? null })),
 		people: l.people.map((p) => ({ email: p.email, name: p.name, linearUserId: p.linearUserId || null })),
-		issues: items
-			.filter((i) => i.open || sync.issues[i.id])
-			.map((i) => ({
+		issues: synced.map((i) => ({
 				key: i.id,
 				existing: sync.issues[i.id] ?? null,
 				open: i.open,
@@ -181,6 +220,12 @@ export function linearPayload(l, { studioUrl = "" } = {}) {
 				assignee_email: i.person?.email || null,
 				assignee_name: i.person?.name || i.owner || null,
 			})),
+		// One Linear "blocks" relation per dependency where both tasks have an issue. `existing` is the relation id from an
+		// earlier sync; `remove` lists relations the sync made for dependencies that no longer exist.
+		relations: synced.flatMap((i) => i.after.filter((p) => inLinear.has(p)).map((p) => ({ key: `${p}>${i.id}`, blocker: p, blocked: i.id, existing: sync.relations[`${p}>${i.id}`] ?? null }))),
+		remove: Object.entries(sync.relations)
+			.filter(([k]) => !synced.some((i) => i.after.some((p) => `${p}>${i.id}` === k && inLinear.has(p))))
+			.map(([key, id]) => ({ key, id })),
 	};
 }
 
@@ -191,6 +236,7 @@ export function applyLinearResult(l, res) {
 	for (const k of ["teamId", "teamName", "projectId", "projectUrl"]) if (res[k]) s[k] = String(res[k]);
 	Object.assign(s.milestones, res.milestones ?? {});
 	for (const [key, v] of Object.entries(res.issues ?? {})) if (v?.id) s.issues[key] = { id: v.id, identifier: v.identifier ?? "", url: v.url ?? "", state: v.state ?? s.issues[key]?.state ?? "", syncedAt: now };
+	for (const [key, id] of Object.entries(res.relations ?? {})) if (/^[^>]+>[^>]+$/.test(key)) id ? (s.relations[key] = String(id)) : delete s.relations[key];
 	for (const [email, id] of Object.entries(res.people ?? {})) {
 		const p = l.people.find((x) => x.email === String(email).toLowerCase());
 		if (p && id) p.linearUserId = String(id);

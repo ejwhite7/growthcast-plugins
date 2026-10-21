@@ -1,6 +1,6 @@
 ---
 name: launch-linear-sync
-description: Sync a launch from the GrowthCast release checklist studio to Linear through Composio. Creates or updates a Linear project with a milestone per phase and one issue per open task, assigned to the person staffed on it with its due date, and pulls issue state back into the checklist. Use for "Sync to Linear" requests, or when someone asks to push a launch plan to Linear, create launch tickets, or assign launch tasks to the team.
+description: Sync a launch from the GrowthCast release checklist studio to Linear through Composio. Creates or updates a Linear project with a milestone per phase and one issue per open task, assigned to the person staffed on it with its due date and launch context, links each task to what it waits on with "blocked by" relations, and pulls issue state back into the checklist. Use for "Sync to Linear" requests, or when someone asks to push a launch plan to Linear, create launch tickets, or assign launch tasks to the team.
 argument-hint: "[launch id or name]"
 ---
 
@@ -17,7 +17,9 @@ can arrive with an HTTP 200.
 - `project`: `{ existingId, name, description (≤250 chars), start_date, target_date, lead_email }`
 - `milestones[]`: `{ phase, name, target_date, existingId }`
 - `people[]`: `{ email, name, linearUserId }`
-- `issues[]`: `{ key, existing, open, title, description, due_date, priority, milestone, role, assignee_email, assignee_name }`
+- `issues[]`: `{ key, existing, open, title, description, due_date, priority, milestone, role, assignee_email, assignee_name }`. The description already holds the task's context and what it waits on; send it as is.
+- `relations[]`: `{ key, blocker, blocked, existing }`, one per dependency where both tasks have an issue. `existing` is the relation id from an earlier sync.
+- `remove[]`: `{ key, id }`, relations an earlier sync made for dependencies that no longer exist.
 
 ## 2. Resolve the team and people
 - **Team.** If `team.id` is empty, call `LINEAR_LIST_LINEAR_TEAMS` and ask the user which team owns the launch (AskUserQuestion). Read both `data.teams` and `data.items`. Use the UUID, never the key or name.
@@ -54,7 +56,16 @@ Batch up to 50 independent calls per `COMPOSIO_MULTI_EXECUTE_TOOL`.
 - **Existing but closed in the studio** (`open: false`): leave the issue alone and list it in the summary, so the owner can close it in Linear.
 - **Milestones.** Attach issues to their phase milestone with one `LINEAR_RUN_QUERY_OR_MUTATION`, using aliased mutations: `m1: issueUpdate(id: "<issue id>", input: { projectMilestoneId: "<milestone id>" }) { success }`, chunked about 25 per call. This is optional: if it errors, skip it and say so.
 
-## 6. Pull state back
+## 6. Dependencies
+After the issues exist, map each `blocker` and `blocked` key to its issue id (from `existing.id` or what you just created).
+- **Read what's there.** One `LINEAR_RUN_QUERY_OR_MUTATION` per 20 blocker issues, aliased:
+  `i0: issue(id: "<id>") { id relations(first: 50) { nodes { id type relatedIssue { id } } } }`. A `blocks` relation from the blocker to the blocked issue already exists if one is listed; use its id.
+- **Create the missing ones** with aliased mutations, about 20 per call:
+  `r0: issueRelationCreate(input: { issueId: "<blocker issue id>", relatedIssueId: "<blocked issue id>", type: blocks }) { success issueRelation { id } }`.
+- **Delete** each `remove[]` relation that still exists: `d0: issueRelationDelete(id: "<id>") { success }`.
+- Skip any pair where either issue is gone from the project. Record `key → relation id` for every relation that exists after this, and `key → null` for each one you deleted.
+
+## 7. Pull state back
 Read every linked issue's state with one `LINEAR_RUN_QUERY_OR_MUTATION`:
 `query($id: String!) { project(id: $id) { issues(first: 250) { nodes { id identifier url state { type } } } } }`.
 Map each issue `id` back to its `key`. The studio maps `state.type` like this:
@@ -62,21 +73,23 @@ Map each issue `id` back to its `key`. The studio maps `state.type` like this:
 - `canceled` → N/A
 - `started` → in progress
 
-## 7. Write back
+## 8. Write back
 Save this JSON to a file in the scratchpad, then run `node <tools>/studio.mjs link <id> <file>`:
 ```json
 { "teamId": "", "teamName": "", "projectId": "", "projectUrl": "",
   "milestones": { "decide": "<id>", "...": "..." },
   "issues": { "<key>": { "id": "", "identifier": "GRO-12", "url": "", "state": "unstarted" } },
   "people": { "<email>": "<linear user id>" },
+  "relations": { "<blocker key>><blocked key>": "<relation id or null>" },
   "pulled": { "<key>": { "state": "completed" } } }
 ```
 The output lists the checklist items whose status changed. The open studio reloads by itself.
 
-## 8. Report
+## 9. Report
 In chat, give:
 - the project link
 - issues created, updated and left alone
+- dependency links created and removed
 - who got how many issues
 - who couldn't be assigned, and why
 - the items the pull ticked off

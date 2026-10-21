@@ -3,7 +3,8 @@
 // short pause. The server file is the source of truth: when its version changes underneath (Claude edited it), the
 // studio reloads it. Ask Claude queues a request that goes to Claude Code with the user's next message there.
 // The same app runs in the GrowthCast client portal ("web mode", see below), so every API path is relative.
-import { ITEMS as ITEM_DEFS, VIDEO_APPROVERS, VIDEO_DELIVERABLES, VIDEO_FORMATS, VIDEO_HANDOFFS, DELIVERABLE_STATUS, ASSETS, ASSET_STATUS, ITEM_STATUS, LAUNCH_STATUS, PHASES, ROLES, ROLE_INFO, RUBRIC, workload, STAGES, TIERS, VERDICT, addDays, assetsFor, checks, daysBetween, effectiveTier, fmtDate, itemsFor, progress, readiness, tLabel, tierOf, tierScore, tierFromScore, today, validDate } from "./model.mjs";
+import { ITEMS as ITEM_DEFS, CTX_BLOCKS, ctxDefault, dependencyCycle, VIDEO_APPROVERS, VIDEO_DELIVERABLES, VIDEO_FORMATS, VIDEO_HANDOFFS, DELIVERABLE_STATUS, ASSETS, ASSET_STATUS, ITEM_STATUS, LAUNCH_STATUS, PHASES, ROLES, ROLE_INFO, RUBRIC, workload, STAGES, TIERS, VERDICT, addDays, assetsFor, checks, daysBetween, effectiveTier, fmtDate, itemsFor, progress, readiness, tLabel, tierOf, tierScore, tierFromScore, today, validDate } from "./model.mjs";
+import { issueDescription, launchOverview } from "./teamplan.mjs";
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -331,11 +332,12 @@ function viewChecklist() {
 const removedItems = (l) => ITEM_DEFS.filter((i) => l.items[i.id]?.removed && i.tiers.includes(effectiveTier(l)));
 const phaseName = (id) => PHASES.find((p) => p.id === id)?.label ?? id;
 
+const itemText = (id) => itemsFor(S.launch).find((x) => x.id === id)?.text ?? id;
 function itemRow(i) {
 	const d = daysBetween(S.launch.t0, i.due);
 	return `<div class="item st-${i.status} ${i.overdue ? "late" : ""}" id="it-${i.id}">
 		<select class="stsel" data-v="${i.status}" data-item="${i.id}" data-f="status" data-rerender>${opt(ITEM_STATUS, i.status)}</select>
-		<div class="txt"><span class="t">${esc(i.text)}</span>${i.gate ? '<span class="badge">GATE</span>' : ""}${i.custom ? '<span class="badge">custom</span>' : i.edited ? '<span class="badge">edited</span>' : ""}<small>${esc(i.role)}${i.person && !i.owner ? ` → ${esc(i.person.name)}` : ""} · ${tLabel(d)}${i.due !== i.planned ? " · moved" : ""}${i.issue ? ` · <a href="${esc(i.issue.url)}" target="_blank" rel="noopener">${esc(i.issue.identifier || "Linear")}</a>` : ""}</small></div>
+		<div class="txt"><span class="t">${esc(i.text)}</span>${i.gate ? '<span class="badge">GATE</span>' : ""}${i.custom ? '<span class="badge">custom</span>' : i.edited ? '<span class="badge">edited</span>' : ""}<small>${esc(i.role)}${i.person && !i.owner ? ` → ${esc(i.person.name)}` : ""} · ${tLabel(d)}${i.due !== i.planned ? " · moved" : ""}${i.open && i.waitingOn.length ? ` · <span class="waits" title="Waits on: ${esc(i.waitingOn.map((x) => itemText(x)).join("; "))}">waits on ${i.waitingOn.length}</span>` : ""}${i.issue ? ` · <a href="${esc(i.issue.url)}" target="_blank" rel="noopener">${esc(i.issue.identifier || "Linear")}</a>` : ""}</small></div>
 		<input list="owners" data-item="${i.id}" data-f="owner" value="${esc(i.owner)}" placeholder="${esc(i.person?.name || i.role)}" title="Leave blank to use whoever is staffed on ${esc(i.role)}">
 		<input type="date" class="due ${i.overdue ? "late" : ""}" data-item="${i.id}" data-f="due" data-rerender value="${esc(i.due)}">
 		<input class="ev" data-item="${i.id}" data-f="evidence" value="${esc(i.evidence)}" placeholder="Evidence link (optional)">
@@ -384,7 +386,7 @@ function linearCard(l) {
 	else {
 		const teams = [...(c.teams ?? [])];
 		if (ln.teamId && !teams.some((t) => t.id === ln.teamId)) teams.unshift({ id: ln.teamId, name: ln.teamName || "Current team" });
-		body = `<p class="hint">Sync creates a Linear project for this launch, with a milestone per phase and one issue per open task, assigned to its owner by email, with the due date. Re-syncing updates those issues instead of duplicating them, and issues closed in Linear tick off here.</p>
+		body = `<p class="hint">Sync creates a Linear project for this launch, with a milestone per phase and one issue per open task, assigned to its owner by email, with the due date, its context and a “blocked by” link for each task it waits on. Re-syncing updates those issues instead of duplicating them, and issues closed in Linear tick off here.</p>
 		<div class="row"><select data-act-change="linearTeam"${ln.projectId ? " disabled" : ""}>${opt([["", "Choose a Linear team…"], ...teams.map((t) => [t.id, t.name])], ln.teamId)}</select><button class="primary" data-act="linearSync"${ln.teamId ? "" : " disabled"}>${ln.projectId ? "Re-sync to Linear" : "Sync to Linear"}</button>${open}<button data-act="linearDisconnect">Disconnect</button></div>`;
 	}
 	return `<div class="card"><h3 style="margin-top:0">Linear <small>${c?.connected ? `${esc(c.workspace)}${c.by ? ` · connected by ${esc(c.by)}` : ""}` : c?.pending ? "connecting" : "not connected"}</small></h3>${body}</div>`;
@@ -412,13 +414,17 @@ function viewStaffing() {
 			${w.unassigned.length ? `<p class="small" style="margin-top:12px"><a href="#" data-who="unassigned" class="v-no-go">${w.unassigned.length} items have no owner →</a></p>` : ""}
 		</div>
 	</div>
+	<div class="card"><h3 style="margin-top:0">Task context <small>shared on every Linear issue</small></h3>
+		<p class="hint">The overview every task carries, so the whole team works from the same story. Each issue also gets the message-house blocks that fit its role (pillars for social, limits for support, and so on). Change those, add a note for one task, or set what it waits on with <b>Edit</b> on the Checklist tab.</p>
+		${ta("context", launchOverview({ ...l, context: "" }) || "One or two sentences: what we're launching, for whom, and why now.", 3)}
+	</div>
 	${WEB() ? `${linearCard(l)}<div class="card"><h3 style="margin-top:0">Team launch plan</h3><p class="hint">Goals, milestones, roles and each person's tasks with due dates, to present to the team. Everyone on this portal project can open it.</p><div class="row"><button class="primary" data-act="teamPlan">Open team launch plan</button><a class="btnlink" href="api/launches/${l.id}/tasks.csv">Download tasks CSV</a></div></div>` : `<div class="card"><h3 style="margin-top:0">Linear <small>${ln.projectId ? `project linked · ${Object.keys(ln.issues).length} issues${ln.syncedAt ? ` · synced ${esc(ln.syncedAt.slice(0, 16).replace("T", " "))}` : ""}${ln.pulledAt ? ` · states pulled ${esc(ln.pulledAt.slice(0, 16).replace("T", " "))}` : ""}` : "not synced yet"}</small></h3>
-		<p class="hint">Sync creates a Linear project for this launch (via Composio), with a milestone per phase and one issue per open task, assigned to its owner, with the due date. Re-syncing updates existing issues instead of duplicating them, and issues closed in Linear tick off here, with the issue as evidence.</p>
+		<p class="hint">Sync creates a Linear project for this launch (via Composio), with a milestone per phase and one issue per open task, assigned to its owner, with the due date, its context and a “blocked by” link for each task it waits on. Re-syncing updates existing issues instead of duplicating them, and issues closed in Linear tick off here, with the issue as evidence.</p>
 		<div class="row">${ln.projectUrl ? `<a class="btnlink" href="${esc(ln.projectUrl)}" target="_blank" rel="noopener">Open in Linear${ln.teamName ? ` (${esc(ln.teamName)})` : ""} ↗</a>` : ""}<button class="primary" data-ask="sync">${ln.projectId ? "Re-sync to Linear" : "Sync to Linear"}</button><button data-act="teamPlan">Open team launch plan</button><a class="btnlink" href="api/launches/${l.id}/tasks.csv">Download tasks CSV</a></div>
 	</div>`}`;
 }
 
-const VIDEO_STEPS = [["video-brief", "Brief"], ["video-script", "Script"], ["ui-freeze", "UI freeze"], ["video-production", "Production"], ["video-review", "Review"], ["video-final", "Master"], ["video-cutdowns", "Cutdowns"], ["video-handoff", "Hand-off"], ["social-sequence", "Launch"], ["video-performance", "Performance"]];
+const VIDEO_STEPS = [["video-brief", "Brief"], ["video-script", "Script"], ["ui-freeze", "UI freeze"], ["video-production", "Production"], ["video-review", "Review"], ["video-final", "Master"], ["video-cutdowns", "Cutdowns"], ["video-thumbnail", "Thumbnail"], ["video-handoff", "Hand-off"], ["youtube-launch-video", "YouTube"], ["social-sequence", "Launch"], ["video-performance", "Performance"]];
 function viewVideo() {
 	const l = S.launch;
 	const v = l.video;
@@ -843,8 +849,26 @@ const ACT = {
 		el.focus();
 	},
 	editItem: (el) => {
-		const i = itemsFor(S.launch).find((x) => x.id === el.dataset.id);
+		const all = itemsFor(S.launch);
+		const i = all.find((x) => x.id === el.dataset.id);
 		if (!i) return;
+		// What it would wait on with no edit for this launch, to tell an edit from the default.
+		const baseline = (() => {
+			if (i.custom) return null;
+			const l = structuredClone(S.launch);
+			if (l.items[i.id]) delete l.items[i.id].after;
+			return itemsFor(l).find((x) => x.id === i.id)?.after ?? [];
+		})();
+		const others = all.filter((x) => x.id !== i.id);
+		const deps = PHASES.map((ph) => {
+			const its = others.filter((x) => x.phase === ph.id);
+			return its.length ? `<div class="dep-phase">${esc(ph.label)}</div>${its.map((x) => `<label class="row small"><input type="checkbox" name="after" value="${esc(x.id)}"${i.after.includes(x.id) ? " checked" : ""}${i.blocks.includes(x.id) ? ' disabled title="This item waits on it, so it can\'t also come first"' : ""}> ${esc(x.text.slice(0, 90))}${x.open ? "" : ' <span class="muted">(done)</span>'}</label>`).join("")}` : "";
+		}).join("");
+		const short = (id) => `“${esc(itemText(id).length > 60 ? `${itemText(id).slice(0, 59)}…` : itemText(id))}”`;
+		const now = `<p class="hint">${i.after.length ? `Now: ${i.after.map(short).join(", ")}` : "Nothing yet: it can start any time."}</p>`;
+		const blocks = i.blocks.length ? `<p class="hint">Blocks: ${i.blocks.map(short).join(", ")}</p>` : "";
+		const ctxBoxes = CTX_BLOCKS.map(([k, label]) => `<label class="row small"><input type="checkbox" name="ctx" value="${k}"${i.ctx.includes(k) ? " checked" : ""}> ${esc(label)}</label>`).join("");
+		const preview = issueDescription(S.launch, i, { items: all });
 		const offset = i.custom ? S.launch.custom.find((c) => c.id === i.id).due : null;
 		const del = i.gate
 			? `<p class="hint">This is a go/no-go gate, so it can't be deleted. Waive it with a reason instead.</p>`
@@ -853,11 +877,16 @@ const ACT = {
 			${field("Item", `<textarea name="text" rows="3" required>${esc(i.text)}</textarea>`)}
 			<div class="grid2">${field("Phase", `<select name="phase">${opt(PHASES.map((x) => [x.id, x.label]), i.phase)}</select>`)}${field("Role", `<select name="role">${opt(ROLES.map((r) => [r, r]), i.role)}</select>`)}</div>
 			${i.custom ? field("Planned due <em>days from T-0</em>", `<input name="offset" type="number" value="${offset}">`) : !i.custom && i.edited ? `<p class="hint">Default: “${esc(i.def.text)}” · ${esc(phaseName(i.def.phase))} · ${esc(i.def.role)}. <button class="sm" value="reset" formnovalidate>Reset to default</button></p>` : ""}
+			<div class="field"><span>Waits on <em>${i.after.length} · a Linear sync makes each one a “blocked by”</em></span>${now}<div class="deps">${deps}</div></div>
+			${blocks}
+			${field("Context for this task <em>added to its Linear issue</em>", `<textarea name="context" rows="2" placeholder="What the owner needs to know that the plan doesn't say">${esc(i.context)}</textarea>`)}
+			<div class="field"><span>Also include <em>from the brief and message house</em></span><div class="ctx-grid">${ctxBoxes}</div></div>
+			<details class="small"><summary>Preview the Linear issue (as saved)</summary><pre class="issue-preview">${esc(preview)}</pre></details>
 			${del}
 			<div class="actions"><button class="danger" value="delete" formnovalidate${i.gate ? " disabled" : ""}>Delete</button><span style="flex:1"></span><button value="cancel" formnovalidate>Cancel</button><button class="primary" value="ok">Save</button></div>`, async (fd, v) => {
 			const l = S.launch;
 			if (v === "reset") {
-				for (const k of ["text", "phase", "role"]) delete S.launch.items[i.id][k];
+				for (const k of ["text", "phase", "role", "after", "ctx"]) delete S.launch.items[i.id][k];
 			} else if (v === "delete") {
 				if (i.custom) {
 					l.custom = l.custom.filter((c) => c.id !== i.id);
@@ -867,10 +896,22 @@ const ACT = {
 			} else {
 				const text = String(fd.get("text")).trim().slice(0, 400);
 				if (!text) throw new Error("The item needs some text.");
-				if (i.custom) Object.assign(l.custom.find((c) => c.id === i.id), { text, phase: fd.get("phase"), role: fd.get("role"), due: Number.parseInt(fd.get("offset"), 10) || 0 });
-				else {
-					const st = (l.items[i.id] ??= { status: "todo", owner: "", due: "", evidence: "", note: "" });
+				const after = fd.getAll("after").map(String);
+				const loop = dependencyCycle(l, { [i.id]: after });
+				if (loop) throw new Error(`That makes a loop: ${loop.map(itemText).map((t) => t.slice(0, 30)).join(" → ")}.`);
+				const ctx = fd.getAll("ctx").map(String);
+				const sameCtx = (a, b) => a.length === b.length && a.every((k) => b.includes(k));
+				const context = String(fd.get("context") ?? "").trim().slice(0, 2000);
+				const st = (l.items[i.id] ??= { status: "todo", owner: "", due: "", evidence: "", note: "" });
+				context ? (st.context = context) : delete st.context;
+				if (i.custom) {
+					const c = l.custom.find((x) => x.id === i.id);
+					Object.assign(c, { text, phase: fd.get("phase"), role: fd.get("role"), due: Number.parseInt(fd.get("offset"), 10) || 0, after });
+					sameCtx(ctx, ctxDefault(i.id, c.role)) ? delete c.ctx : (c.ctx = ctx);
+				} else {
 					for (const [k, val] of [["text", text], ["phase", fd.get("phase")], ["role", fd.get("role")]]) val === i.def[k] ? delete st[k] : (st[k] = val);
+					sameCtx(after, baseline) ? delete st.after : (st.after = after);
+					sameCtx(ctx, ctxDefault(i.id, st.role || i.def.role)) ? delete st.ctx : (st.ctx = ctx);
 				}
 			}
 			markDirty();
@@ -886,7 +927,7 @@ const ACT = {
 	addItem: () => {
 		const text = $("#newText").value.trim();
 		if (!text) return;
-		S.launch.custom.push({ id: `c_${Date.now().toString(36)}`, phase: $("#newPhase").value, role: $("#newRole").value, text, due: Number($("#newDue").value) || 0 });
+		S.launch.custom.push({ id: `c_${Date.now().toString(36)}`, phase: $("#newPhase").value, role: $("#newRole").value, text, due: Number($("#newDue").value) || 0, after: [] });
 		markDirty();
 		render();
 	},

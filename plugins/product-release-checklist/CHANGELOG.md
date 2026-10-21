@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0
+- **Dependencies.** Every checklist item now lists what it waits on, from tiering through the T+90 readout. Change them per launch under **Edit** on any item, custom items included. When an item the launch doesn't have sits in the middle of a chain (another tier, or removed), the dependency passes through to what that item waits on. The checklist shows "waits on N" on open items, flags dependency loops, and warns when an item is due before something it waits on.
+- **Linear "blocked by".** A Linear sync now adds a "blocks" relation for each dependency where both tasks have an issue. Re-syncs reuse existing relations and remove the ones the sync made for dependencies that were later dropped.
+- **Task context on Linear issues.** Each issue carries a launch overview (set on the Staffing tab; it defaults to the message-house one-liner), plus the message-house and brief blocks that fit the task's role: pillars and proof, audience, words to use and avoid, CTAs, objections, limits, eligibility, quotes, success metric and video brief. Per task, **Edit** adds a note and changes which blocks go in, and previews the issue. Issues also list what they wait on and what they block, and say when the message house is still a draft.
+- The tasks CSV gains "Task id" and "Waits on" columns.
+- New checklist items for T1 and T2: the launch video thumbnail (T-4, design) and posting the launch video to YouTube (T-0). Thumbnails move out of the cutdowns item, and both show on the Video tab's steps.
+
 ## 0.7.1
 - New checklist items: an optional pre-launch teaser motion graphic (T-4), a teaser post scheduled for T-2, and handing product marketing, launch video and vertical-specific assets off to paid.
 - Paid runs for T1 and T2 launches: audiences, creative, budget, search, the paid video cuts and the paid hand-off.

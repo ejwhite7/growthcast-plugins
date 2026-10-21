@@ -189,7 +189,7 @@ test("team plan: per-person sections, unassigned section, CSV rows", () => {
 test("video: workstream items for T1/T2, gate, migration and checks", () => {
 	const { launch: l } = normalize({ id: "l_v", name: "V", t0: "2026-11-17", tier: { override: 2 }, items: { video: { status: "done", evidence: "x" } } });
 	const ids = itemsFor(l).map((i) => i.id);
-	for (const id of ["video-brief", "video-script", "ui-freeze", "video-production", "video-review", "video-final", "video-cutdowns", "video-handoff", "video-performance"]) assert.ok(ids.includes(id), id);
+	for (const id of ["video-brief", "video-script", "ui-freeze", "video-production", "video-review", "video-final", "video-cutdowns", "video-thumbnail", "video-handoff", "youtube-launch-video", "video-performance"]) assert.ok(ids.includes(id), id);
 	assert.equal(l.items["video-final"].status, "done", "old single video item migrates to video-final");
 	const gate = readiness(l).gates.find((g) => g.id === "video");
 	assert.ok(gate && !gate.ok, "hero cut not ready keeps the video gate closed");
@@ -199,4 +199,92 @@ test("video: workstream items for T1/T2, gate, migration and checks", () => {
 	assert.match(checks(l).map((c) => c.text).join("\n"), /3 review rounds/);
 	const { launch: t3 } = normalize({ id: "l_v3", name: "V", t0: "2026-11-17", tier: { override: 3 } });
 	assert.ok(!itemsFor(t3).some((i) => i.id.startsWith("video")), "T3 has no video workstream");
+});
+
+import { AFTER, dependencyCycle, itemById } from "../studio/model.mjs";
+import { issueDescription } from "../studio/teamplan.mjs";
+
+test("dependencies: every default names real items, has no loop, and is never due after what it unblocks", () => {
+	for (const [id, after] of Object.entries(AFTER)) {
+		assert.ok(itemById[id], `unknown item ${id}`);
+		for (const p of after) {
+			assert.ok(itemById[p], `${id} waits on unknown ${p}`);
+			assert.ok(itemById[p].due <= itemById[id].due, `${p} (${itemById[p].due}) is due after ${id} (${itemById[id].due})`);
+		}
+	}
+	const { launch } = normalize({ id: "l_d", name: "D", t0: "2026-11-17" });
+	assert.equal(dependencyCycle(launch), null);
+	assert.ok(!checks(launch).some((c) => c.area === "Checklist"), "default dates respect the dependencies");
+	const orphans = ITEMS.filter((i) => !i.after.length && !ITEMS.some((x) => x.after.includes(i.id)));
+	assert.deepEqual(orphans.map((i) => i.id), [], "every item is in the graph");
+});
+
+test("dependencies: pass through items the tier drops or the launch removes, without redundant links", () => {
+	const { launch: t3 } = normalize({ id: "l_d3", name: "D", t0: "2026-11-17", tier: { override: 3 } });
+	const by = Object.fromEntries(itemsFor(t3).map((i) => [i.id, i]));
+	assert.deepEqual(by["flag-live"].after, ["readiness"], "rollout-ready is T1/T2; its events dependency is already behind readiness");
+	assert.deepEqual(by.kb.after, ["message-house"]);
+	const { launch: l } = normalize({ id: "l_dr", name: "D", t0: "2026-11-17", tier: { override: 2 }, items: { "teaser-motion": { removed: true } } });
+	assert.deepEqual(itemsFor(l).find((i) => i.id === "teaser-post").after, ["message-house", "ui-freeze"]);
+});
+
+test("dependencies: editable per launch, custom items too, unknown ids dropped, loops flagged", () => {
+	const { launch: l } = normalize({
+		id: "l_de", name: "D", t0: "2026-11-17", tier: { override: 2 },
+		items: { banner: { after: ["c_1", "nope", "banner"] }, "message-house": { status: "done" } },
+		custom: [{ id: "c_1", text: "Banner art", phase: "build", role: "DESIGN", due: -6, after: ["message-house"] }],
+	});
+	assert.deepEqual(l.items.banner.after, ["c_1"]);
+	const by = Object.fromEntries(itemsFor(l).map((i) => [i.id, i]));
+	assert.deepEqual(by.banner.after, ["c_1"]);
+	assert.deepEqual(by.c_1.after, ["message-house"]);
+	assert.deepEqual(by.c_1.waitingOn, [], "done dependencies don't hold it up");
+	assert.deepEqual(by.banner.waitingOn, ["c_1"]);
+	assert.ok(by.c_1.blocks.includes("banner"));
+	assert.deepEqual([...new Set(dependencyCycle(l, { c_1: ["banner"] }))].sort(), ["banner", "c_1"]);
+	l.custom[0].after = ["banner"];
+	assert.match(checks(l).map((c) => c.text).join("\n"), /Dependency loop/);
+	l.custom[0].after = [];
+	l.items.banner.due = "2026-11-01";
+	assert.match(checks(l).map((c) => c.text).join("\n"), /before “Banner art”/);
+});
+
+test("task context: overview on every issue, role blocks, per-task note and overrides", () => {
+	const { launch: l } = normalize({
+		id: "l_c", name: "Smart invoices", t0: "2026-11-17", tier: { override: 2 },
+		context: "Invoices send from the customer's own domain.",
+		message: { oneLiner: "Get paid faster", limits: "US only for now", pillars: [{ claim: "Lands in the inbox", proof: "98% delivery in beta" }], useWords: "your domain", objections: [{ q: "Is DNS hard?", a: "Two records, guided." }] },
+		items: { kb: { context: "Screenshots from the beta workspace.", ctx: ["limits"] } },
+	});
+	const all = itemsFor(l);
+	const kb = issueDescription(l, all.find((i) => i.id === "kb"), { items: all });
+	assert.match(kb, /What we're launching:\*\* Invoices send from the customer's own domain/);
+	assert.match(kb, /For this task:\*\* Screenshots from the beta workspace/);
+	assert.match(kb, /US only for now/);
+	assert.doesNotMatch(kb, /Is DNS hard/, "the override replaces the SUPPORT default");
+	assert.match(kb, /isn't approved yet/);
+	assert.match(kb, /Waits on:\*\*\n- .*Message house/);
+	const social = issueDescription(l, all.find((i) => i.id === "social-company"), { items: all });
+	assert.match(social, /Lands in the inbox \(proof: 98% delivery in beta\)/);
+	assert.match(social, /\*\*Use:\*\* your domain/);
+	const tier = issueDescription(l, all.find((i) => i.id === "tier"), { items: all });
+	assert.doesNotMatch(tier, /Pillars/, "DRI tasks get the overview only");
+	l.context = "";
+	assert.match(issueDescription(l, itemsFor(l).find((i) => i.id === "tier")), /What we're launching:\*\* Get paid faster/);
+});
+
+test("linear relations: one per dependency with both issues, kept on re-sync, stale ones listed for removal", () => {
+	const l = staffed();
+	const p = linearPayload(l);
+	const keys = new Set(p.issues.map((i) => i.key));
+	assert.ok(p.relations.length > 50);
+	assert.ok(p.relations.every((r) => keys.has(r.blocker) && keys.has(r.blocked) && r.key === `${r.blocker}>${r.blocked}` && !r.existing));
+	assert.ok(p.relations.some((r) => r.key === "message-house>claims"));
+	applyLinearResult(l, { projectId: "pr1", issues: { "message-house": { id: "i1" }, claims: { id: "i2" } }, relations: { "message-house>claims": "r1", "old>claims": "r2" } });
+	const again = linearPayload(normalize(l).launch);
+	assert.equal(again.relations.find((r) => r.key === "message-house>claims").existing, "r1");
+	assert.deepEqual(again.remove, [{ key: "old>claims", id: "r2" }]);
+	applyLinearResult(l, { relations: { "old>claims": null } });
+	assert.deepEqual(Object.keys(l.sync.linear.relations), ["message-house>claims"]);
+	assert.match(renderTasksCsv(l).split("\n")[0], /Task id,Waits on$/);
 });

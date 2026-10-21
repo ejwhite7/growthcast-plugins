@@ -19,7 +19,9 @@ are checklist items, dated back from T-0:
 | `video-review` | T-6 | PMM, Founder and Legal approved (2 rounds max) |
 | `video-final` | T-5 | Master approved and archived (**go/no-go gate** for T1/T2, with the hero cut ready) |
 | `video-cutdowns` | T-4 | Every deliverable for the tier exported and captioned |
+| `video-thumbnail` | T-4 | Thumbnail picked from 2 options, cover frames set for vertical and square |
 | `video-handoff` | T-3 | The packet went to every team on the Video tab |
+| `youtube-launch-video` | T-0 | Hero cut public on YouTube with title, description, chapters, captions and thumbnail |
 | `video-performance` | T+7 | Read and acted on |
 
 Read the message house first. The video says one thing, the one-liner, and every claim must have proof there.
@@ -76,7 +78,7 @@ Production paths:
 ## Master and cutdowns → `video.master`, `video.archive`, `video.deliverables`
 Export each deliverable for the tier (spec on the Video tab). Hero and vertical are always required for T1/T2; T1 adds square and paid cuts.
 - **Captions:** an SRT for every cut, plus burned-in captions on social cuts.
-- **Thumbnails:** 2 options per cut.
+- **Thumbnails (`video-thumbnail`):** 2 options for the hero cut at 1280×720 (16:9, under 2 MB). Show the outcome, not a logo, with 3–5 words of text that still read at phone size and that don't repeat the title. Pick one; the other is the A/B alternate in YouTube's thumbnail test. Set cover frames for the vertical and square cuts.
 - **Paid cuts:** 3 hook variants. Need `video.rights.paid` set before they're handed to PAID.
 - **Archive:** the master, project files, raw footage and licenses.
 
@@ -88,6 +90,16 @@ Each team's packet holds the files, the captions, and the copy it needs:
 - **Support:** the KB embed.
 - **CS:** a link and a one-liner.
 - **Archive:** the archive link.
+
+## YouTube (T-0) → item `youtube-launch-video`
+Upload the hero cut unlisted by T-1 so processing and HD are done, then make it public at T-0 before the founder post goes out.
+- **Title:** what a searcher would type (the job, then the feature name), under 60 characters.
+- **Description:** the one-liner in the first two lines, then links with `utm_source=youtube&utm_content=hero` to the landing page, KB and signup, then chapters (00:00 first).
+- **Captions:** upload the SRT, don't rely on auto-captions.
+- **Thumbnail:** the one picked for `video-thumbnail`.
+- **End screen and pinned comment:** both point to the landing page or the YouTube tutorial.
+- **Playlist:** add it to the launch or product-updates playlist.
+- Send the public link to web (embed), support (KB) and CS. This is separate from the `youtube` tutorial item.
 
 ## Performance (T+7) → item `video-performance` note, `measure.channels`
 For each cut and channel, report:

@@ -46,6 +46,7 @@ asset specs and readiness gates are defined once in `studio/model.mjs`: read it 
   "status": "planning",            // planning | building | go | launched | measuring | closed
   "t0": "2026-11-17",              // launch date; every checklist due date counts back from it
   "dri": "Sam (PMM)",              // one person, not the founder
+  "context": "",                   // overview on every Linear issue; "" = message.oneLiner, else the brief's first line
   "rollout": { "full": true, "note": "flag name, % schedule" },   // full: true | false | null (unconfirmed)
   "brief": { "description": "", "persona": "", "job": "", "alternative": "", "evidence": "", "plans": "", "platforms": "",
              "regions": "", "pricing": "", "pricingDecided": false, "outcome": "", "risks": "", "links": "" },
@@ -53,8 +54,11 @@ asset specs and readiness gates are defined once in `studio/model.mjs`: read it 
             "reasons": { "reach": "one line", … }, "override": null|1|2|3, "overrideReason": "" },
   "items": { "<item id>": { "status": "todo|doing|done|waived|na", "owner": "", "due": "" /* "" = planned date */,
                             "evidence": "link", "note": "" /* waiver reason when waived */,
-                            /* default items only, all optional: */ "text": "", "phase": "", "role": "", "removed": true } },
-  "custom": [{ "id": "c_…", "phase": "build", "text": "", "role": "PMM", "due": -5 /* days from T-0 */ }],
+                            "context": "" /* what this task's owner needs to know; goes on its Linear issue */,
+                            /* default items only, all optional: */ "text": "", "phase": "", "role": "", "removed": true,
+                            "after": ["<item id>"] /* replaces the default dependencies */,
+                            "ctx": ["pillars|audience|words|ctas|objections|limits|eligibility|quotes|metric|video"] /* replaces the role's context blocks */ } },
+  "custom": [{ "id": "c_…", "phase": "build", "text": "", "role": "PMM", "due": -5 /* days from T-0 */, "after": [], "ctx": [] /* optional */ }],
   "message": { "status": "draft|approved", "approvedAt": "", "featureName": "", "oneLiner": "", "elevator": "", "promise": "",
                "pillars": [{ "claim": "", "proof": "", "approved": false }], "forWho": "", "notFor": "", "before": "", "after": "",
                "objections": [{ "q": "", "a": "" }], "useWords": "", "avoidWords": "", "limits": "",
@@ -78,7 +82,8 @@ asset specs and readiness gates are defined once in `studio/model.mjs`: read it 
   "staffing": { "PMM": "p_…", "DRI": "p_…" },     // role → person id; items inherit the owner from their role
   "sync": { "linear": { "teamId": "", "teamName": "", "projectId": "", "projectUrl": "", "syncedAt": "", "pulledAt": "",
                         "milestones": { "<phase>": "<milestone id>" },
-                        "issues": { "<item id>": { "id": "", "identifier": "GRO-12", "url": "", "state": "", "syncedAt": "" } } } },
+                        "issues": { "<item id>": { "id": "", "identifier": "GRO-12", "url": "", "state": "", "syncedAt": "" } },
+                        "relations": { "<blocker id>><blocked id>": "<relation id>" } } },
   "retro": { "outcome": "", "worked": "", "didnt": "", "gaps": "", "benchmarks": "" }
 }
 ```
@@ -86,6 +91,16 @@ asset specs and readiness gates are defined once in `studio/model.mjs`: read it 
 An item's owner is `items.<id>.owner` if it names someone on `people` (by name or email). Otherwise it's the person
 `staffing` maps the item's role to. Setting the DRI role also sets `dri`. Don't write `sync.linear` by hand: use
 `studio.mjs link` so ids and pulled states merge correctly.
+
+**Dependencies.** Every default item has an `after` list in `AFTER` (studio/model.mjs): the items that must be done
+first. `items.<id>.after` replaces it for one launch. Dependencies on items the launch doesn't have (another tier, or
+removed) pass through to what those items wait on. Never write a loop; the studio flags one as an error, and it warns
+when an open item is due before something it waits on.
+
+**Task context.** Each Linear issue carries the launch overview (`context`), the item's own `items.<id>.context`, and the
+brief and message-house blocks for its role (`CTX_ROLES`, `CTX_ITEMS` in the model; `items.<id>.ctx` overrides). Write
+`context` and per-item notes in plain language a new teammate could act on; never put claims there that the message house
+doesn't support.
 
 Stage values are counts ("2100") or percentages ("12%"). Write them as strings.
 
