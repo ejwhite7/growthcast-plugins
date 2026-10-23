@@ -1,0 +1,15 @@
+/* GrowthCast visual system: warm cream paper, dark ink, rust accent, square edges. Fonts fall back to system stacks (no font files bundled). */
+:root {
+	--bg: #f4f1e9; --panel: #fffdf8; --card: #fffdf8; --fg: #242426; --muted: #5f5c56; --line: #d7d2c7; --line-2: #bdb8ae;
+	--accent: #ff6b4a; --accent-text: #b63f25; --accent-soft: #ffe6de; --sage: #e0edc7; --ink-btn: #242426; --ink-btn-fg: #ffffff;
+	--error: #c4321c; --warn: #8a5800; --good: #27785a; --focus: #1d4ed8;
+	--sans: Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; --mono: "DM Mono", ui-monospace, Menlo, monospace;
+	color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #1b1b1d; --panel: #242426; --card: #27282a; --fg: #f4f1e9; --muted: #b0aba1; --line: #3a3a3d; --line-2: #4c4b4f;
+		--accent-text: #ff9a82; --accent-soft: #3d2620; --sage: #2c3a26; --ink-btn: #f4f1e9; --ink-btn-fg: #242426;
+		--error: #ff8270; --warn: #f0b44c; --good: #7cc4a0; --focus: #8fb0ff; color-scheme: dark;
+	}
+}

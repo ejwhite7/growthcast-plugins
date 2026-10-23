@@ -8,6 +8,14 @@
   },
   "plugins": [
     {
+      "name": "webinar-strategy",
+      "source": "./plugins/webinar-strategy",
+      "description": "Virtual Event Strategy by GrowthCast: strategy canvas, event briefs, role-based launch checklists and shareable handoffs.",
+      "version": "0.1.0",
+      "category": "marketing",
+      "homepage": "https://growthcast.app"
+    },
+    {
       "name": "gtm-positioning",
       "source": "./plugins/gtm-positioning",
       "description": "GTM Positioning by GrowthCast: evidence research, Jobs-to-be-Done, positioning, ICP-specific product marketing guidance, and ad or website copy, with confidence checks that flag evidence gaps.",

@@ -1,0 +1,16 @@
+{
+	"name": "webinar-strategy",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Virtual Event Strategy by GrowthCast: a Claude Code plugin with a local studio for planning virtual events (strategy, event brief, RSVP form spec, workflow, exports). Planning only.",
+	"scripts": {
+		"start": "node tools/studio.mjs",
+		"test": "node --test test/*.test.mjs",
+		"check": "node --check tools/studio.mjs && node --check studio/model.mjs && node --check studio/store.mjs && node --check studio/content.mjs && node --check studio/exports.mjs && node --check studio/app.js && node --check test/browser-smoke.mjs && node --check test/model.test.mjs && node --check test/exports.test.mjs && node --check test/store.test.mjs && node --check test/server.test.mjs && node --check test/review-fixes.test.mjs && node --check test/share-tasks.test.mjs",
+		"smoke": "node test/browser-smoke.mjs"
+	},
+	"engines": { "node": ">=20" },
+	"license": "MIT",
+	"author": "GrowthCast (https://growthcast.app)"
+}

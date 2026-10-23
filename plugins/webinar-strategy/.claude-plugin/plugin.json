@@ -1,0 +1,19 @@
+{
+  "name": "webinar-strategy",
+  "displayName": "Virtual Event Strategy by GrowthCast",
+  "version": "0.1.0",
+  "description": "Plan virtual events in a local studio: why virtual events work, crawl/walk/run tooling, event brief and RSVP form spec, create-to-repurpose workflow, session library, and public/private exports. Planning only: nothing is published or sent.",
+  "author": {
+    "name": "GrowthCast",
+    "url": "https://growthcast.app"
+  },
+  "homepage": "https://growthcast.app",
+  "license": "MIT",
+  "keywords": [
+    "webinar",
+    "marketing",
+    "events",
+    "growth",
+    "planning"
+  ]
+}

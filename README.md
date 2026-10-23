@@ -4,6 +4,7 @@ The `growthcast` marketplace: one place to install every GrowthCast plugin.
 
 | Plugin | What it does | Files |
 |---|---|---|
+| `webinar-strategy` | Virtual Event Strategy: strategy canvas, briefs and launch checklists | [`plugins/webinar-strategy`](plugins/webinar-strategy) · [source](https://github.com/ejwhite7/webinar-strategy) |
 | `gtm-positioning` | GTM Positioning by GrowthCast: evidence research, Jobs-to-be-Done, positioning, ICP guidance and copy | [`plugins/gtm-positioning`](plugins/gtm-positioning) · [source](https://github.com/ejwhite7/gtm-positioning) |
 | `paid-media-planner` | Paid Media Campaign Planner by GrowthCast: plan, mock and hand off paid campaigns across eight ad networks | [`plugins/paid-media-planner`](plugins/paid-media-planner) · [source](https://github.com/ejwhite7/paid-media-planner) |
 | `product-release-checklist` | Product Release Checklist by GrowthCast: tiered launch system from kickoff to T+90 readout | [`plugins/product-release-checklist`](plugins/product-release-checklist) · [source](https://github.com/ejwhite7/product-release-checklist) |
@@ -12,6 +13,7 @@ The `growthcast` marketplace: one place to install every GrowthCast plugin.
 
 ```text
 /plugin marketplace add ejwhite7/growthcast-plugins
+/plugin install webinar-strategy@growthcast
 /plugin install gtm-positioning@growthcast
 /plugin install paid-media-planner@growthcast
 /plugin install product-release-checklist@growthcast

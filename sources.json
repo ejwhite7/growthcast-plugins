@@ -1,4 +1,9 @@
 {
+	"webinar-strategy": {
+		"repo": "ejwhite7/webinar-strategy",
+		"sha": "3257c963e1a36efacb6723ff997c24f932dc6c41",
+		"version": "0.1.0"
+	},
 	"gtm-positioning": {
 		"repo": "ejwhite7/gtm-positioning",
 		"sha": "097a1d1fc8fdd592e81cfb223f171eb4159edc78",

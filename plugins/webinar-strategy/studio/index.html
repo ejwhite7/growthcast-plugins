@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<title>Virtual Event Strategy · GrowthCast</title>
+	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23ff6b4a'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='%23242426' font-family='sans-serif' font-weight='700'%3EW%3C/text%3E%3C/svg%3E">
+	<link rel="stylesheet" href="tokens.css">
+	<link rel="stylesheet" href="studio.css">
+</head>
+<body>
+	<a class="skip" href="#stage">Skip to content</a>
+	<header class="top">
+		<button id="menuBtn" class="icon-btn" aria-label="Toggle sessions sidebar" aria-controls="side" aria-expanded="true">☰</button>
+		<a class="logo" href="#why"><span class="wordmark">GrowthCast</span><span class="product">Virtual Event Strategy</span></a>
+		<span id="crumb" class="crumb"></span>
+		<span class="grow"></span>
+		<span class="chip planning" title="This studio plans virtual events. It does not publish pages, collect registrations or send messages.">Planning only · nothing published or sent</span>
+		<span id="saveState" class="muted small" role="status" aria-live="polite"></span>
+	</header>
+	<div id="banner" class="banner" role="alert" hidden></div>
+	<div class="shell">
+		<aside id="side" class="side" aria-label="Sessions"></aside>
+		<main id="stage" tabindex="-1"></main>
+	</div>
+	<dialog id="dlg" aria-labelledby="dlgTitle"></dialog>
+	<script type="module" src="app.js"></script>
+</body>
+</html>
