@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.8.3
+- Linear issues carry the full task text. The "Waits on" and "Blocks" lists no longer cut each task name off at 80 characters, and a task whose text is longer than the issue title now repeats in full as **Task** in the issue body.
+
 ## 0.8.2
 - In the client portal, the Staffing tab says the team is saved for the project: new launches in it start with that team, and its launches with no team yet pick it up.
 

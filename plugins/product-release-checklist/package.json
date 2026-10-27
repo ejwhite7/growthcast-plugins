@@ -1,6 +1,6 @@
 {
 	"name": "product-release-checklist",
-	"version": "0.8.2",
+	"version": "0.8.3",
 	"private": true,
 	"type": "module",
 	"description": "Product Release Checklist by GrowthCast: a Claude Code plugin with a local studio for planning, launching and measuring product announcements.",

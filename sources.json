@@ -16,7 +16,7 @@
 	},
 	"product-release-checklist": {
 		"repo": "ejwhite7/product-release-checklist",
-		"sha": "f80c591cf6cd9e8832a92ef5a487f024abe6cabc",
-		"version": "0.8.2"
+		"sha": "240c5d66f7cb97773b7691ba97ff443fe145a200",
+		"version": "0.8.3"
 	}
 }

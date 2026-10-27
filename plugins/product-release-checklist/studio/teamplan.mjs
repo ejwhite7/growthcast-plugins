@@ -160,18 +160,22 @@ export function taskContext(l, i) {
 }
 
 // --- Linear ---
+// Issue titles stay short; a longer task text goes in full into the body, as do the names of what it waits on and blocks.
+const TITLE_MAX = 120;
+export const issueTitle = (i) => (i.text.length > TITLE_MAX ? `${i.text.slice(0, TITLE_MAX - 3)}…` : i.text);
 // The issue body: the task, what it waits on and blocks, then its context.
 export function issueDescription(l, i, { studioUrl = "", items = itemsFor(l) } = {}) {
 	const byId = Object.fromEntries(items.map((x) => [x.id, x]));
 	const assetFor = Object.fromEntries(ASSETS.filter((a) => a.item).map((a) => [a.item, a]));
 	const name = (id) => {
 		const x = byId[id];
-		return x ? `${x.issue?.identifier ? `${x.issue.identifier} ` : ""}${clip(x.text, 80)}${x.open ? "" : " (done)"}` : id;
+		return x ? `${x.issue?.identifier ? `${x.issue.identifier} ` : ""}${x.text}${x.open ? "" : " (done)"}` : id;
 	};
 	const ctx = taskContext(l, i);
 	return [
 		`**Launch:** ${l.name} · T-0 ${fmtDate(l.t0)}${tierOf(l) ? ` · T${tierOf(l)}` : ""}`,
 		`**Phase:** ${phaseLabel(i.phase)} · **Role:** ${i.role} · **Due:** ${fmtDate(i.due)} (${tLabel(daysBetween(l.t0, i.due))})`,
+		i.text.length > TITLE_MAX ? `**Task:** ${i.text}` : "",
 		i.gate ? "**Go/no-go gate.** The launch can't go ahead until this is done." : "",
 		assetFor[i.id] ? `**Deliverable:** ${assetFor[i.id].label}. ${assetFor[i.id].spec}` : "",
 		i.after.length ? `**Waits on:**\n${i.after.map((id) => `- ${name(id)}`).join("\n")}` : "",
@@ -211,7 +215,7 @@ export function linearPayload(l, { studioUrl = "" } = {}) {
 				key: i.id,
 				existing: sync.issues[i.id] ?? null,
 				open: i.open,
-				title: i.text.length > 120 ? `${i.text.slice(0, 117)}…` : i.text,
+				title: issueTitle(i),
 				description: describe(i),
 				due_date: i.due,
 				priority: i.gate ? 2 : ["launch", "gonogo"].includes(i.phase) ? 2 : 3,

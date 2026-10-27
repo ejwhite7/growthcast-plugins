@@ -202,7 +202,26 @@ test("video: workstream items for T1/T2, gate, migration and checks", () => {
 });
 
 import { AFTER, dependencyCycle, itemById } from "../studio/model.mjs";
-import { issueDescription } from "../studio/teamplan.mjs";
+import { issueDescription, issueTitle } from "../studio/teamplan.mjs";
+
+test("Linear issues carry the full task text: dependency names are never clipped, and a long task goes in full into the body", () => {
+	const { launch: l } = normalize({ id: "l_full", name: "Full", t0: "2026-11-17", tier: { override: 1 } });
+	const all = itemsFor(l);
+	const campaign = all.find((i) => i.id === "paid-launch-campaign");
+	const audiences = itemById.audiences.text;
+	assert.ok(audiences.length > 80 && campaign.text.length > 120, "the fixture items are long enough to have been clipped");
+	const body = issueDescription(l, campaign, { items: all });
+	const waits = body.slice(body.indexOf("**Waits on:**"), body.indexOf("**Blocks:**") > -1 ? body.indexOf("**Blocks:**") : body.indexOf("---"));
+	assert.ok(waits.includes(`- ${audiences}\n`), "waits-on names are the whole task text");
+	assert.ok(body.includes(`**Task:** ${campaign.text}`), "a task longer than the title carries its full text");
+	assert.doesNotMatch(body, /…/, "nothing in the dependency lists or task text is clipped");
+	assert.ok(issueTitle(campaign).length <= 120 && issueTitle(campaign).endsWith("…"));
+	assert.ok(campaign.text.startsWith(issueTitle(campaign).slice(0, -1)));
+	const handoffBody = issueDescription(l, all.find((i) => i.id === "paid-handoff"), { items: all });
+	assert.match(handoffBody, /\*\*Blocks:\*\*\n(- .*\n)*- Launch campaign live with the launch ad creative, one ad set per audience/);
+	assert.doesNotMatch(handoffBody, /\*\*Task:\*\*/, "a task that fits the title isn't repeated");
+	assert.equal(linearPayload(l).issues.find((x) => x.key === campaign.id)?.title, issueTitle(campaign));
+});
 
 test("dependencies: every default names real items, has no loop, and is never due after what it unblocks", () => {
 	for (const [id, after] of Object.entries(AFTER)) {
