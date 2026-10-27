@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<title>CPA Map · GrowthCast</title>
+	<link rel="icon" href="favicon.jpg">
+	<link rel="stylesheet" href="tokens.css">
+	<link rel="stylesheet" href="studio.css">
+	<style id="chartCss"></style>
+</head>
+<body>
+	<header class="top">
+		<button id="toggleLeft" class="icon-btn" title="Hide the filters ( [ )" aria-pressed="true">◧</button>
+		<div class="logo"><span class="wordmark">GrowthCast</span><span class="product">CPA Map</span></div>
+		<select id="account" title="Account"></select>
+		<span id="platform" class="platform" hidden></span>
+		<nav class="views"><button data-view="map" class="on">Map</button><button data-view="actions">Actions</button><button data-view="readout">Readout</button></nav>
+		<span class="grow"></span>
+		<span id="saveState"></span>
+		<button id="refreshBtn" class="quiet" title="Ask Claude to pull this account again">Refresh</button>
+		<button id="settingsBtn" title="Lines, thresholds and conversions">Settings</button>
+		<div class="menu"><button id="exportBtn" class="primary">Export ▾</button><div id="exportMenu" class="menu-list" hidden></div></div>
+		<button id="toggleRight" class="icon-btn" title="Hide the inspector ( ] )" aria-pressed="true">◨</button>
+	</header>
+	<main>
+		<aside class="left" id="rail"></aside>
+		<section id="stage"></section>
+		<aside class="right" id="inspector"></aside>
+	</main>
+	<aside id="drawer" class="drawer" hidden></aside>
+	<div id="tip" class="tip" hidden></div>
+	<div id="toast" class="toast" hidden></div>
+	<script type="module" src="app.js"></script>
+</body>
+</html>

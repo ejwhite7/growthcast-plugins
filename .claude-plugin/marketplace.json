@@ -38,6 +38,14 @@
       "version": "0.8.4",
       "category": "marketing",
       "homepage": "https://growthcast.app"
+    },
+    {
+      "name": "cpa-map",
+      "source": "./plugins/cpa-map",
+      "description": "CPA Map by GrowthCast: every Meta or Google ad on one spend \u00d7 CPA map with kill and scale lines, fed by BlueAlpha; report, slides, action plan and readout exports.",
+      "version": "0.2.0",
+      "category": "marketing",
+      "homepage": "https://growthcast.app"
     }
   ]
 }

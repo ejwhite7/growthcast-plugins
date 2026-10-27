@@ -1,0 +1,53 @@
+/* GrowthCast visual system (growthcast.app): cream paper, ink, coral accent, square edges, Manrope with DM Mono labels.
+   Shared by the studio and every export; the same tokens the Paid Media Planner and Release Checklist use. */
+@font-face { font-family: Manrope; src: url("fonts/manrope-400.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: Manrope; src: url("fonts/manrope-500.ttf") format("truetype"); font-weight: 500; font-display: swap; }
+@font-face { font-family: Manrope; src: url("fonts/manrope-600.ttf") format("truetype"); font-weight: 600; font-display: swap; }
+@font-face { font-family: Manrope; src: url("fonts/manrope-700.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "DM Mono"; src: url("fonts/dm-mono-400.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "DM Mono"; src: url("fonts/dm-mono-500.ttf") format("truetype"); font-weight: 500; font-display: swap; }
+:root {
+	--bg: #f4f1e9; --panel: #fffdf8; --card: #fffdf8; --fg: #242426; --muted: #6d6a64; --line: #d7d2c7; --line-2: #bdb8ae;
+	--accent: #ff6b4a; --accent-text: #b63f25; --accent-soft: #ffe6de; --sage: #e0edc7; --ink-btn: #242426; --ink-btn-fg: #ffffff;
+	--error: #c4321c; --error-soft: #f8ddd6; --warn: #9a6200; --info: #6d6a64; --good: #27785a; --good-soft: #e0edc7; --claude: #b63f25;
+	--shadow: 0 1px 0 rgba(36,36,38,.06), 0 6px 16px rgba(36,36,38,.06);
+	--sans: Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; --mono: "DM Mono", ui-monospace, Menlo, monospace;
+	color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) {
+		--bg: #1b1b1d; --panel: #242426; --card: #27282a; --fg: #f4f1e9; --muted: #a8a399; --line: #3a3a3d; --line-2: #4c4b4f;
+		--accent: #ff6b4a; --accent-text: #ff9a82; --accent-soft: #3d2620; --sage: #2c3a26; --ink-btn: #f4f1e9; --ink-btn-fg: #242426;
+		--error: #ff8270; --error-soft: #3d2620; --warn: #f0b44c; --info: #a8a399; --good: #7cc4a0; --good-soft: #2c3a26; --claude: #ff9a82;
+		--shadow: 0 1px 0 rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.35);
+		color-scheme: dark;
+	}
+}
+:root[data-theme="dark"] {
+	--bg: #1b1b1d; --panel: #242426; --card: #27282a; --fg: #f4f1e9; --muted: #a8a399; --line: #3a3a3d; --line-2: #4c4b4f;
+	--accent: #ff6b4a; --accent-text: #ff9a82; --accent-soft: #3d2620; --sage: #2c3a26; --ink-btn: #f4f1e9; --ink-btn-fg: #242426;
+	--error: #ff8270; --error-soft: #3d2620; --warn: #f0b44c; --info: #a8a399; --good: #7cc4a0; --good-soft: #2c3a26; --claude: #ff9a82;
+	--shadow: 0 1px 0 rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.35);
+	color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 var(--sans); font-synthesis: none; -webkit-font-smoothing: antialiased; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.mono { font-family: var(--mono); }
+[hidden] { display: none !important; }
+/* Pills shared by the studio and the exports */
+.pill { display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: .02em; padding: 1px 8px; border-radius: 99px; background: var(--line); color: var(--muted); vertical-align: middle; white-space: nowrap; }
+.pill.kill { background: var(--error-soft); color: var(--error); }
+.pill.scale, .pill.revive { background: var(--good-soft); color: var(--good); }
+.pill.test, .pill.hold { background: var(--accent-soft); color: var(--accent-text); }
+.pill.off { background: var(--line); color: var(--muted); }
+.fun { font-family: var(--mono); font-size: 11px; font-weight: 500; padding: 1px 7px; border: 1px solid; white-space: nowrap; }
+.fun-tof { color: #b63f25; border-color: #ff6b4a; background: #ffe6de; }
+.fun-mof { color: #8a5a00; border-color: #e0a63a; background: #fbefd2; }
+.fun-bof { color: #27785a; border-color: #27785a; background: #e0edc7; }
+.fun-unknown { color: var(--muted); border-color: var(--line-2); }
+.gc-bar { display: flex; align-items: baseline; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--fg); }
+.wordmark { font-weight: 700; font-size: 18px; letter-spacing: -.02em; }
+.product { color: var(--muted); font-size: 13px; }
+.foot { color: var(--muted); font-size: 12px; padding: 24px; text-align: center; }

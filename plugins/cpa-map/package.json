@@ -1,0 +1,14 @@
+{
+	"name": "cpa-map",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "CPA Map by GrowthCast: a Claude Code plugin that maps every Meta ad by lifetime spend and CPA, with kill / scale / revive calls, fed by BlueAlpha.",
+	"scripts": {
+		"start": "node tools/cpamap.mjs --open",
+		"test": "node --test test/*.test.mjs"
+	},
+	"engines": { "node": ">=20" },
+	"license": "MIT",
+	"author": "GrowthCast (https://growthcast.app)"
+}

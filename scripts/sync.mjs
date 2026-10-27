@@ -23,6 +23,8 @@ const skip = new Set([".git", ".github", "node_modules", ".claude-plugin/marketp
 const changes = [];
 for (const [name, source] of Object.entries(sources)) {
 	if (only && name !== only) continue;
+	// First-party plugins developed in this repository (sources.json: inRepo) have no upstream to copy from.
+	if (source.inRepo || !source.repo) continue;
 	const entry = marketplace.plugins.find((p) => p.name === name);
 	if (!entry) throw new Error(`${name} is in sources.json but not marketplace.json`);
 

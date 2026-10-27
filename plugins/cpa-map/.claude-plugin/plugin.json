@@ -1,0 +1,14 @@
+{
+	"name": "cpa-map",
+	"displayName": "CPA Map by GrowthCast",
+	"version": "0.2.0",
+	"description": "Every Meta or Google ad on one map (log lifetime spend × CPA) from BlueAlpha data, with account, target, kill and scale lines. Work the playbook: turn paused winners back on, kill and scale what's live, compare like with like by format, grade each funnel stage on its own metric. Exports a GrowthCast report, slide deck, action plan and account readout.",
+	"author": { "name": "GrowthCast", "url": "https://growthcast.app" },
+	"homepage": "https://growthcast.app",
+	"supportUrl": "https://growthcast.app/support",
+	"privacyPolicyUrl": "https://growthcast.app/privacy",
+	"termsOfServiceUrl": "https://growthcast.app/terms",
+	"license": "MIT",
+	"keywords": ["marketing", "paid-media", "meta-ads", "facebook-ads", "google-ads", "cpa", "creative-analysis", "bluealpha", "account-audit"],
+	"repository": "https://github.com/ejwhite7/growthcast-plugins"
+}

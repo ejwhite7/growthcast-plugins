@@ -8,6 +8,7 @@ The `growthcast` marketplace: one place to install every GrowthCast plugin.
 | `gtm-positioning` | GTM Positioning by GrowthCast: evidence research, Jobs-to-be-Done, positioning, ICP guidance and copy | [`plugins/gtm-positioning`](plugins/gtm-positioning) · [source](https://github.com/ejwhite7/gtm-positioning) |
 | `paid-media-planner` | Paid Media Campaign Planner by GrowthCast: plan, mock and hand off paid campaigns across eight ad networks | [`plugins/paid-media-planner`](plugins/paid-media-planner) · [source](https://github.com/ejwhite7/paid-media-planner) |
 | `product-release-checklist` | Product Release Checklist by GrowthCast: tiered launch system from kickoff to T+90 readout | [`plugins/product-release-checklist`](plugins/product-release-checklist) · [source](https://github.com/ejwhite7/product-release-checklist) |
+| `cpa-map` | CPA Map by GrowthCast: every Meta or Google ad on one spend × CPA map with kill and scale lines, report, slides and readout exports | [`plugins/cpa-map`](plugins/cpa-map) (developed here) |
 
 ## Install
 
@@ -17,11 +18,12 @@ The `growthcast` marketplace: one place to install every GrowthCast plugin.
 /plugin install gtm-positioning@growthcast
 /plugin install paid-media-planner@growthcast
 /plugin install product-release-checklist@growthcast
+/plugin install cpa-map@growthcast
 ```
 
 ## How releases reach the marketplace
 
-Each plugin's files live in this repo under `plugins/<name>/`, and `.claude-plugin/marketplace.json` points `source`
+Each plugin's files live in this repo under `plugins/<name>/` (`cpa-map` is developed here directly: edit it in place, bump its version and commit), and `.claude-plugin/marketplace.json` points `source`
 at that folder (`./plugins/<name>`). Day-to-day development still happens in each plugin's own repo (the GrowthCast
 client portals run code from those repos). `sources.json` records which repo, commit and version each folder was copied
 from.

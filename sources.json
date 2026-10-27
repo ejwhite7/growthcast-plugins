@@ -18,5 +18,11 @@
 		"repo": "ejwhite7/product-release-checklist",
 		"sha": "b41223158c972aaa4e9a697f552e75e62b6a89f1",
 		"version": "0.8.4"
+	},
+	"cpa-map": {
+		"repo": null,
+		"inRepo": true,
+		"version": "0.2.0",
+		"note": "Developed in this repository under plugins/cpa-map; no upstream repo, so sync.mjs skips it."
 	}
 }
