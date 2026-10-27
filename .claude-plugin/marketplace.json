@@ -35,7 +35,7 @@
       "name": "product-release-checklist",
       "source": "./plugins/product-release-checklist",
       "description": "Product Release Checklist by GrowthCast: tiered launch system from kickoff to T+90 adoption readout.",
-      "version": "0.8.3",
+      "version": "0.8.4",
       "category": "marketing",
       "homepage": "https://growthcast.app"
     }

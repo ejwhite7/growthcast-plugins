@@ -386,7 +386,7 @@ function linearCard(l) {
 	else {
 		const teams = [...(c.teams ?? [])];
 		if (ln.teamId && !teams.some((t) => t.id === ln.teamId)) teams.unshift({ id: ln.teamId, name: ln.teamName || "Current team" });
-		body = `<p class="hint">Sync creates a Linear project for this launch, with a milestone per phase and one issue per open task, assigned to its owner by email, with the due date, its context and a “blocked by” link for each task it waits on. Re-syncing updates those issues instead of duplicating them, and issues closed in Linear tick off here.</p>
+		body = `<p class="hint">Sync creates a Linear project for this launch, with a milestone per phase and one issue per open task, assigned to its owner by email, with the due date, its context and a “blocked by” link for each task it waits on. Re-syncing updates those issues instead of duplicating them. Issues closed in Linear tick off here whenever the launch is opened, with the issue as evidence.</p>
 		<div class="row"><select data-act-change="linearTeam"${ln.projectId ? " disabled" : ""}>${opt([["", "Choose a Linear team…"], ...teams.map((t) => [t.id, t.name])], ln.teamId)}</select><button class="primary" data-act="linearSync"${ln.teamId ? "" : " disabled"}>${ln.projectId ? "Re-sync to Linear" : "Sync to Linear"}</button>${open}<button data-act="linearDisconnect">Disconnect</button></div>`;
 	}
 	return `<div class="card"><h3 style="margin-top:0">Linear <small>${c?.connected ? `${esc(c.workspace)}${c.by ? ` · connected by ${esc(c.by)}` : ""}` : c?.pending ? "connecting" : "not connected"}</small></h3>${body}</div>`;

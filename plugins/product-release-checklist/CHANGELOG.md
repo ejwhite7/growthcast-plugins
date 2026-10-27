@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.8.4
+- Hosted checklist: opening a launch pulls its issue states back from Linear, so an issue closed there ticks the task off without a re-sync. The Linear card says so.
+
 ## 0.8.3
 - Linear issues carry the full task text. The "Waits on" and "Blocks" lists no longer cut each task name off at 80 characters, and a task whose text is longer than the issue title now repeats in full as **Task** in the issue body.
 
