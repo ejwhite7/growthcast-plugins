@@ -8,7 +8,7 @@ import { planSections, readoutSections } from "./report.mjs";
 
 const $ = (s, el = document) => el.querySelector(s);
 const FILTERS = () => ({ live: "live", format: "all", stage: "all", campaign: "all", adset: "all", y: "cpa", hide: false, q: "" });
-const S = { app: { mode: "local", canEdit: true, asks: [], pdf: false }, accounts: [], id: null, data: null, settings: null, version: null, result: null, view: "map", filters: FILTERS(), step: 6, selected: null, sort: { key: "action", dir: 1 }, request: null, drawer: false };
+const S = { app: { mode: "local", canEdit: true, asks: [], pdf: false, platforms: { meta: true, google: true } }, projects: [], project: "", connections: [], pickable: { platform: "", list: null, busy: false }, accounts: [], id: null, data: null, settings: null, version: null, result: null, view: "map", filters: FILTERS(), step: 6, selected: null, sort: { key: "action", dir: 1 }, request: null, drawer: false };
 const STEPS = {
 	0: { title: "Every ad on one map.", sub: "Log lifetime spend across, CPA up. Left half is testing; top right is high spend / high cost; bottom right is where the money is.", filters: { live: "all" } },
 	5: { title: "Not live: turn old winners back on.", sub: "Paused ads under the scale line with 3+ purchases that aren't one-offs (promos, launches). Turn them back on.", filters: { live: "off" } },
@@ -45,11 +45,33 @@ async function boot() {
 	try {
 		S.app = await api("api/settings");
 	} catch {}
+	if (WEB()) {
+		try {
+			S.projects = (await api("api/projects")).projects ?? [];
+		} catch {}
+		const q = new URLSearchParams(location.search);
+		S.project = S.projects.find((p) => p.id === q.get("project"))?.id ?? S.projects.find((p) => p.id === localStorage.getItem("cpamap:project"))?.id ?? S.projects[0]?.id ?? "";
+		const sel = $("#project");
+		sel.hidden = false;
+		sel.innerHTML = S.projects.map((p) => `<option value="${esc(p.id)}" ${p.id === S.project ? "selected" : ""}>${esc(p.name)}</option>`).join("") || `<option>No projects</option>`;
+		$("#refreshBtn").title = "Pull this account again from the ad platform";
+	}
 	await loadAccounts();
 	setInterval(poll, 2500);
 }
+const WEB = () => S.app.mode === "web";
+const currentProject = () => S.projects.find((p) => p.id === S.project) ?? null;
+async function loadConnections() {
+	if (!WEB() || !S.project) return;
+	try {
+		S.connections = await api(`api/connections?projectId=${encodeURIComponent(S.project)}`);
+	} catch (e) {
+		S.connections = [];
+	}
+}
 async function loadAccounts() {
-	S.accounts = await api("api/accounts");
+	S.accounts = await api(WEB() ? `api/accounts?projectId=${encodeURIComponent(S.project)}` : "api/accounts");
+	await loadConnections();
 	const hash = decodeURIComponent(location.hash.slice(1));
 	S.id = S.accounts.find((a) => a.id === hash)?.id ?? S.accounts[0]?.id ?? null;
 	const q = new URLSearchParams(location.search);
@@ -59,19 +81,20 @@ async function loadAccounts() {
 		S.step = null;
 	}
 	if (q.get("view")) S.view = q.get("view");
-	$("#account").innerHTML = S.accounts.map((a) => `<option value="${esc(a.id)}" ${a.id === S.id ? "selected" : ""}>${esc(a.name)} · ${(PLATFORMS[a.platform] ?? PLATFORMS.meta).short} · ${a.ads} ads</option>`).join("") || `<option>No accounts yet</option>`;
+	$("#account").innerHTML = S.accounts.map((a) => `<option value="${esc(a.id)}" ${a.id === S.id ? "selected" : ""}>${esc(a.name)} · ${(PLATFORMS[a.platform] ?? PLATFORMS.meta).short} · ${a.building ? "pulling…" : `${a.ads} ads`}</option>`).join("") || `<option>No accounts yet</option>`;
 	if (S.id) await loadAccount();
 	else render();
 }
 async function loadAccount() {
-	const { data, settings, version } = await api(`api/accounts/${S.id}`);
-	Object.assign(S, { data, settings, version });
+	const { data, settings, version, building, request } = await api(`api/accounts/${S.id}`);
+	Object.assign(S, { data, settings, version, building: !!building });
+	if (request) S.request = request;
 	if (location.hash !== `#${S.id}`) history.replaceState(null, "", `#${S.id}`);
 	compute();
 	render();
 }
 function compute() {
-	S.result = S.data ? analyse(S.data, S.settings) : null;
+	S.result = S.data?.ads ? analyse(S.data, S.settings) : null;
 	const p = $("#platform");
 	if (S.result) {
 		p.textContent = PLATFORMS[S.result.platform].label;
@@ -112,7 +135,8 @@ async function poll() {
 		const { version } = await api(`api/accounts/${S.id}/version`);
 		if (version && version !== S.version) {
 			await loadAccount();
-			toast("Reloaded: the data or settings changed");
+			if (WEB()) await loadAccounts();
+			toast(S.building ? "Pulling the account…" : "Reloaded: the data or settings changed");
 		}
 	} catch {}
 	try {
@@ -156,15 +180,33 @@ function render() {
 	renderInspector();
 	renderExportMenu();
 }
+function webPanel() {
+	if (!WEB()) return "";
+	const proj = currentProject();
+	if (!proj) return `<h4>Project</h4><p class="muted small">No project to show. Ask a GrowthCast admin to add you to one.</p>`;
+	const conn = (platform) => S.connections.find((c) => c.platform === platform) ?? { platform, status: "none", available: S.app.platforms?.[platform] };
+	const row = (platform, label) => {
+		const c = conn(platform);
+		if (!c.available) return `<div class="field"><label>${label}</label><span class="muted small">Not set up on this portal yet.</span></div>`;
+		return `<div class="field"><label>${label}</label>${c.status === "active" ? `<span class="small">Connected${c.by ? ` by ${esc(c.by)}` : ""}.</span> ${S.app.canEdit ? `<button class="quiet" data-act="disconnect" data-platform="${platform}" style="margin-left:6px;padding:2px 8px">Disconnect</button>` : ""}` : c.status === "pending" ? `<span class="small muted">Waiting for the connection to finish… <a href="#" data-act="connect" data-platform="${platform}">start again</a></span>` : S.app.canEdit ? `<button data-act="connect" data-platform="${platform}">Connect ${label}</button>` : `<span class="muted small">Not connected.</span>`}</div>`;
+	};
+	const active = ["meta", "google"].filter((p) => conn(p).status === "active");
+	const pk = S.pickable;
+	return `<h4>${esc(proj.name)}</h4>
+	${row("meta", "Meta Ads")}${row("google", "Google Ads")}
+	${S.app.canEdit && active.length ? `<h4>Add an ad account</h4>
+	<div class="field"><label>Platform</label><select id="addPlatform"><option value="">Choose…</option>${active.map((p) => `<option value="${p}" ${pk.platform === p ? "selected" : ""}>${PLATFORMS[p].label}</option>`).join("")}</select></div>
+	${pk.platform ? (pk.list === null ? `<p class="muted small">${pk.busy ? "Listing the ad accounts you can reach…" : ""}</p>` : pk.list.length ? `<div class="field"><label>Account</label><select id="addAccount">${pk.list.map((a) => `<option value="${esc(a.externalId)}" data-name="${esc(a.name)}" data-currency="${esc(a.currency ?? "")}">${esc(a.name)} · ${esc(a.externalId)}${a.currency ? ` · ${esc(a.currency)}` : ""}</option>`).join("")}</select></div><button class="primary" data-act="add-account" style="width:100%">Pull it into the map</button><p class="muted small">A first pull takes a few minutes on a big account.</p>` : `<p class="muted small">The connection can't see any ad accounts. Reconnect with a user who has access.</p>`) : ""}` : ""}`;
+}
 function renderRail() {
 	const rail = $("#rail");
-	if (!S.result) return (rail.innerHTML = `<h4>Accounts</h4><p class="muted small">Nothing built yet. In Claude Code: <code>/cpa-map:open &lt;account name&gt;</code> pulls an account through BlueAlpha and builds the map.</p>`);
+	if (!S.result) return (rail.innerHTML = `${webPanel()}${WEB() ? "" : `<h4>Accounts</h4><p class="muted small">Nothing built yet. In Claude Code: <code>/cpa-map:open &lt;account name&gt;</code> pulls an account through BlueAlpha and builds the map.</p>`}`);
 	const r = S.result, f = S.filters;
 	const count = (pred) => r.ads.filter(pred).length;
 	const seg = (name, opts) => `<div class="seg" role="group" aria-label="${name}">${opts.map(([v, label, n]) => `<button data-filter="${name}" data-v="${esc(v)}" aria-pressed="${f[name] === v}">${esc(label)}${n != null ? `<span class="n">${n}</span>` : ""}</button>`).join("")}</div>`;
 	const [, adsetWord] = level();
 	const campaigns = r.campaigns, adsets = r.adsets.filter((g) => f.campaign === "all" || g.campaignId === f.campaign);
-	rail.innerHTML = `
+	rail.innerHTML = `${webPanel()}
 	<h4>The playbook</h4>
 	<div class="steps">${[0, 5, 6, 7, 8].map((n) => `<button data-step="${n}" aria-pressed="${S.step === n}"><b>${n ? `Step ${n}` : "Map"}</b>${esc(STEPS[n].title)}</button>`).join("")}</div>
 	<h4>Filters</h4>
@@ -193,7 +235,12 @@ function renderAsk() {
 }
 function renderStage() {
 	const stage = $("#stage");
-	if (!S.result) return (stage.innerHTML = `<div class="empty"><p>No account has been built yet.</p><p>Ask Claude: <code>/cpa-map:open Durable</code> (or any Meta or Google Ads account name) and it pulls the ads through BlueAlpha and builds the map.</p></div>`);
+	if (!S.result) {
+		if (S.id && S.building) return (stage.innerHTML = `<div class="empty"><p><b>Pulling ${esc(S.accounts.find((a) => a.id === S.id)?.name ?? "this account")}…</b></p><p>Every ad with spend, the last 30 days and the last 7, straight from the ad platform. This page updates itself when the map is ready.${S.request?.status === "failed" ? `<br><span style="color:var(--error)">The pull failed: ${esc(S.request.error || "unknown error")}. Press Refresh to try again.</span>` : ""}</p></div>`);
+		return (stage.innerHTML = WEB()
+			? `<div class="empty"><p>${S.accounts.length ? "Pick an account above." : "No ad account on this project yet."}</p><p>${S.app.canEdit ? "Connect Meta Ads or Google Ads on the left, then add an ad account: the map pulls every ad and builds itself." : "Ask the GrowthCast team to connect an ad account to this project."}</p></div>`
+			: `<div class="empty"><p>No account has been built yet.</p><p>Ask Claude: <code>/cpa-map:open Durable</code> (or any Meta or Google Ads account name) and it pulls the ads through BlueAlpha and builds the map.</p></div>`);
+	}
 	const r = S.result, f = S.filters;
 	if (S.view === "actions") return (stage.innerHTML = `<div class="doc"><div class="headline"><h1>${esc(S.data.account.name)}: action plan</h1></div><p class="sub">Generated from the rules and the current settings. Ask Claude to write the memo with judgement, or export it below.</p>${planSections(r, S.data)}</div>`);
 	if (S.view === "readout") return (stage.innerHTML = `<div class="doc"><div class="headline"><h1>${esc(S.data.account.name)}: account readout</h1></div><p class="sub">The audit the exports carry: the lines, where the spend sits, like-with-like comparisons, paused winners, caveats.</p>${readoutSections(r, S.data)}</div>`);
@@ -240,11 +287,12 @@ function renderExportMenu() {
 	if (!S.id) return (m.innerHTML = `<p class="muted small" style="padding:8px 12px">Build an account first.</p>`);
 	const base = `api/accounts/${S.id}/`;
 	const pdfNote = S.app.pdf ? "" : `<small>Needs Chrome on the machine running the map; otherwise open the HTML and print to PDF.</small>`;
+	const pdfLinks = S.app.pdf || !WEB() ? `<a href="${base}slides.pdf">Slides PDF<small>The deck, one 16:9 page per slide.${pdfNote}</small></a>
+	<a href="${base}report.pdf">Report PDF<small>The HTML report printed.${pdfNote}</small></a>` : `<a href="${base}slides.html?print" target="_blank" rel="noopener">Slides, print to PDF<small>Opens the deck ready for your browser's Print → Save as PDF (one slide per page).</small></a>`;
 	m.innerHTML = `<h5>Formats</h5>
 	<a href="${base}report.html" target="_blank" rel="noopener">HTML report<small>Readout, map, action plan and every ad, one page. Opens in a new tab.</small></a>
 	<a href="${base}slides.html" target="_blank" rel="noopener">Slides<small>A GrowthCast deck: cover, map, lines, kills, scales, revives, formats, stages, next steps.</small></a>
-	<a href="${base}slides.pdf">Slides PDF<small>The deck, one 16:9 page per slide.${pdfNote}</small></a>
-	<a href="${base}report.pdf">Report PDF<small>The HTML report printed.${pdfNote}</small></a>
+	${pdfLinks}
 	<a href="${base}report.html?download" download>Download HTML</a>
 	<h5>Narrative</h5>
 	<a href="${base}plan.md" download>Action plan (.md)<small>Implement the calls: kills, scales, revives, grouped by campaign, with the numbers.</small></a>
@@ -335,6 +383,47 @@ document.addEventListener("click", (e) => {
 		return;
 	}
 	if (t.id === "refreshBtn") return ask("refresh");
+	if (t.dataset.act === "connect" || t.dataset.act === "disconnect") {
+		e.preventDefault();
+		const platform = t.dataset.platform;
+		(async () => {
+			try {
+				if (t.dataset.act === "connect") {
+					const { url } = await api("api/connections", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: S.project, platform }) });
+					window.open(url, "_blank", "noopener");
+					toast("Finish connecting in the new tab; this page picks it up.");
+				} else {
+					if (!confirm(`Disconnect ${PLATFORMS[platform].label} from ${currentProject()?.name}? Built maps stay; refreshing them needs a new connection.`)) return;
+					await api(`api/connections?projectId=${encodeURIComponent(S.project)}&platform=${platform}`, { method: "DELETE" });
+				}
+				await loadConnections();
+				render();
+			} catch (err) {
+				toast(err.message);
+			}
+		})();
+		return;
+	}
+	if (t.dataset.act === "add-account") {
+		const sel = $("#addAccount"), opt = sel?.selectedOptions[0];
+		if (!opt) return;
+		(async () => {
+			try {
+				t.disabled = true;
+				const { account } = await api("api/accounts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: S.project, projectName: currentProject()?.name ?? "", platform: S.pickable.platform, externalId: opt.value, name: opt.dataset.name, currency: opt.dataset.currency }) });
+				S.pickable = { platform: "", list: null, busy: false };
+				await loadAccounts();
+				S.id = account.id;
+				$("#account").value = S.id;
+				await loadAccount();
+				toast("Pulling the account; this page updates itself when it's ready");
+			} catch (err) {
+				t.disabled = false;
+				toast(err.message);
+			}
+		})();
+		return;
+	}
 	if (t.dataset.act === "reset") {
 		S.filters = { ...FILTERS(), live: "all" };
 		S.step = 0;
@@ -361,6 +450,27 @@ document.addEventListener("click", (e) => {
 });
 document.addEventListener("change", (e) => {
 	const t = e.target;
+	if (t.id === "project") {
+		S.project = t.value;
+		localStorage.setItem("cpamap:project", S.project);
+		S.id = null;
+		S.selected = null;
+		S.pickable = { platform: "", list: null, busy: false };
+		return loadAccounts();
+	}
+	if (t.id === "addPlatform") {
+		S.pickable = { platform: t.value, list: null, busy: !!t.value };
+		renderRail();
+		if (!t.value) return;
+		return api(`api/connections/accounts?projectId=${encodeURIComponent(S.project)}&platform=${t.value}`).then((list) => {
+			S.pickable = { platform: t.value, list, busy: false };
+			renderRail();
+		}).catch((err) => {
+			S.pickable = { platform: t.value, list: [], busy: false };
+			renderRail();
+			toast(err.message);
+		});
+	}
 	if (t.id === "account") {
 		S.id = t.value;
 		S.selected = null;

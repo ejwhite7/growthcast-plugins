@@ -17,7 +17,7 @@ export function renderChart(result, currency, options = {}) {
 	const L = y === "cps" ? result.linesSecondary : result.lines;
 	const yOf = (a) => (y === "cps" ? a.cps : a.cpa);
 	const yName = y === "cps" ? `cost per ${CONVERSION_LABEL[result.secondary]}` : "CPA";
-	const m = { t: 44, r: compact ? 170 : 215, b: 44, l: 64 };
+	const m = { t: 44, r: compact ? 150 : 215, b: 44, l: 64 };
 	const iw = W - m.l - m.r, ih = H - m.t - m.b;
 	const pool = result.ads.filter((a) => !hideOthers || shown(a));
 	const spends = pool.map((a) => a.spend);
@@ -34,12 +34,10 @@ export function renderChart(result, currency, options = {}) {
 	const stepY = niceStep(ymax / 6);
 	const ticksY = [];
 	for (let v = 0; v <= ymax + 1e-9; v += stepY) ticksY.push(v);
-	const rules = [
-		["kill", `kill line · ${s.killMult}× target`, L.kill],
-		["account", `account ${yName} ${fmtMoney(L.account, currency)}`, L.account],
-		["target", `target ${fmtMoney(L.target, currency)} · ${Math.round(s.targetPct * 100)}% under`, L.target],
-		["scale", `scale line · ${s.scaleMult}× target`, L.scale],
-	].filter(([, , v]) => v > 0 && v <= ymax);
+	const rules = (compact
+		? [["kill", `kill ${fmtMoney(L.kill, currency, 0)}`, L.kill], ["account", `account ${fmtMoney(L.account, currency, 0)}`, L.account], ["target", `target ${fmtMoney(L.target, currency, 0)}`, L.target], ["scale", `scale ${fmtMoney(L.scale, currency, 0)}`, L.scale]]
+		: [["kill", `kill line · ${s.killMult}× target`, L.kill], ["account", `account ${yName} ${fmtMoney(L.account, currency)}`, L.account], ["target", `target ${fmtMoney(L.target, currency)} · ${Math.round(s.targetPct * 100)}% under`, L.target], ["scale", `scale line · ${s.scaleMult}× target`, L.scale]]
+	).filter(([, , v]) => v > 0 && v <= ymax);
 	const color = (a) => (a.action === "kill" ? "var(--error)" : a.action === "scale" || a.action === "revive" ? "var(--good)" : a.action === "test" ? "var(--muted)" : "var(--line-2)");
 	const order = (a) => (shown(a) ? 1 : 0) + (a.id === selected ? 2 : 0);
 	const dots = [...pool].sort((a, b) => order(a) - order(b)).map((a) => {
