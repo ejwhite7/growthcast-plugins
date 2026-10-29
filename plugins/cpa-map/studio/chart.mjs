@@ -7,10 +7,12 @@ const niceStep = (raw) => {
 	const f = raw / p;
 	return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
 };
+const niceFloor = (v) => 10 ** Math.floor(Math.log10(Math.max(v, 1e-6)));
 const shortMoney = (v, cur) => fmtMoney(v, cur, 0).replace(/,000,000$/, "M").replace(/,000$/, "K");
 
 // options: { y: "cpa" | "cps", shown: (ad) => boolean, hideOthers, selected, width, height, compact (fewer labels), lines (override),
-//            liveDays, title (aria) }
+//            view: { xmin, xmax, ymin, ymax, ylog } (any part null = the default: spend from min spend, Y from 0 to the cap),
+//            title (aria) }. The svg carries data-* with the scales in force so a host can turn pixels back into values.
 export function renderChart(result, currency, options = {}) {
 	const { y = "cpa", shown = () => true, hideOthers = false, selected = null, width: W = 900, height: H = 520, compact = false } = options;
 	const s = result.settings;
@@ -21,26 +23,40 @@ export function renderChart(result, currency, options = {}) {
 	const iw = W - m.l - m.r, ih = H - m.t - m.b;
 	const pool = result.ads.filter((a) => !hideOthers || shown(a));
 	const spends = pool.map((a) => a.spend);
-	const xmin = Math.max(1, s.minSpend || 100), xmax = Math.max(...spends, xmin * 10) * 1.25;
+	const view = options.view ?? {};
+	const xmin = Math.max(1, view.xmin || s.minSpend || 100), xmax = Math.max(view.xmax || Math.max(...spends, xmin * 10) * 1.25, xmin * 1.5);
 	const lx0 = Math.log10(xmin), lx1 = Math.log10(xmax);
 	const X = (v) => m.l + ((Math.log10(Math.max(v, xmin)) - lx0) / (lx1 - lx0)) * iw;
-	const ymax = L.cap || Math.max(...pool.map((a) => yOf(a) ?? 0), 1);
-	const Y = (v) => m.t + ih - (Math.min(v, ymax) / ymax) * ih;
+	const ylog = !!view.ylog;
+	const ymax = view.ymax || L.cap || Math.max(...pool.map((a) => yOf(a) ?? 0), 1);
+	const ymin = ylog ? Math.max(view.ymin || 0, niceFloor(Math.min(...pool.map((a) => yOf(a)).filter((v) => v > 0), ymax / 100))) : Math.max(0, view.ymin || 0);
+	const ly0 = Math.log10(Math.max(ymin, 1e-9)), ly1 = Math.log10(ymax);
+	const Y = ylog ? (v) => m.t + ih - ((Math.log10(Math.max(v, ymin)) - ly0) / (ly1 - ly0)) * ih : (v) => m.t + ih - ((Math.min(v, ymax) - ymin) / (ymax - ymin)) * ih;
 	const ticksX = [];
-	for (let p = Math.floor(lx0); p <= Math.ceil(lx1); p++) {
-		const v = 10 ** p;
+	for (let p = Math.floor(lx0); p <= Math.ceil(lx1); p++) for (const f of lx1 - lx0 < 1.2 ? [1, 2, 5] : [1]) {
+		const v = f * 10 ** p;
 		if (v >= xmin && v <= xmax) ticksX.push(v);
 	}
-	const stepY = niceStep(ymax / 6);
 	const ticksY = [];
-	for (let v = 0; v <= ymax + 1e-9; v += stepY) ticksY.push(v);
+	if (ylog) {
+		for (let p = Math.floor(ly0); p <= Math.ceil(ly1); p++) for (const f of [1, 2, 5]) {
+			const v = f * 10 ** p;
+			if (v >= ymin && v <= ymax) ticksY.push(v);
+		}
+	} else {
+		const stepY = niceStep((ymax - ymin) / 6);
+		for (let v = Math.ceil(ymin / stepY) * stepY; v <= ymax + 1e-9; v += stepY) ticksY.push(v);
+	}
+	// In view: inside the X range and not under the Y floor. Above the Y top goes to the off-chart strip, as always.
+	const inX = (a) => a.spend >= xmin && a.spend <= xmax;
+	const inY = (v) => v == null || v >= ymin;
 	const rules = (compact
 		? [["kill", `kill ${fmtMoney(L.kill, currency, 0)}`, L.kill], ["account", `account ${fmtMoney(L.account, currency, 0)}`, L.account], ["target", `target ${fmtMoney(L.target, currency, 0)}`, L.target], ["scale", `scale ${fmtMoney(L.scale, currency, 0)}`, L.scale]]
 		: [["kill", `kill line · ${s.killMult}× target`, L.kill], ["account", `account ${yName} ${fmtMoney(L.account, currency)}`, L.account], ["target", `target ${fmtMoney(L.target, currency)} · ${Math.round(s.targetPct * 100)}% under`, L.target], ["scale", `scale line · ${s.scaleMult}× target`, L.scale]]
-	).filter(([, , v]) => v > 0 && v <= ymax);
+	).filter(([, , v]) => v > 0 && v <= ymax && v >= ymin);
 	const color = (a) => (a.action === "kill" ? "var(--error)" : a.action === "scale" || a.action === "revive" ? "var(--good)" : a.action === "test" ? "var(--muted)" : "var(--line-2)");
 	const order = (a) => (shown(a) ? 1 : 0) + (a.id === selected ? 2 : 0);
-	const dots = [...pool].sort((a, b) => order(a) - order(b)).map((a) => {
+	const dots = [...pool].filter((a) => inX(a) && inY(yOf(a))).sort((a, b) => order(a) - order(b)).map((a) => {
 		const v = yOf(a), dim = !shown(a), off = v == null || v > ymax;
 		const cx = X(a.spend).toFixed(1), cy = (off ? m.t - 16 : Y(v)).toFixed(1);
 		const c = color(a), sel = a.id === selected;
@@ -49,12 +65,13 @@ export function renderChart(result, currency, options = {}) {
 			: `<circle class="mark" cx="${cx}" cy="${cy}" r="5.5" fill="${a.live ? c : "var(--card)"}" stroke="${a.live ? "var(--card)" : c}" stroke-width="${a.live ? 1.5 : 1.8}"/>`;
 		return `<g class="dot${dim ? " dim" : ""}${sel ? " sel" : ""}" data-id="${esc(a.id)}">${sel ? `<circle cx="${cx}" cy="${cy}" r="11" fill="none" stroke="${c}" stroke-width="2"/>` : ""}${mark}<circle class="hit" cx="${cx}" cy="${cy}" r="10" fill="transparent"/></g>`;
 	}).join("");
-	return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(options.title ?? `Every ad: lifetime spend against ${yName}`)}">
+	const outside = pool.filter((a) => shown(a) && !(inX(a) && inY(yOf(a)))).length;
+	return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(options.title ?? `Every ad: lifetime spend against ${yName}`)}" data-xmin="${xmin}" data-xmax="${xmax}" data-ymin="${ymin}" data-ymax="${ymax}" data-ylog="${ylog ? 1 : 0}" data-plot="${m.l},${m.t},${iw},${ih}" data-outside="${outside}">
 <g class="grid">${ticksY.map((v) => `<line x1="${m.l}" x2="${m.l + iw}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/>`).join("")}${ticksX.map((v) => `<line y1="${m.t}" y2="${m.t + ih}" x1="${X(v).toFixed(1)}" x2="${X(v).toFixed(1)}"/>`).join("")}</g>
 <line x1="${m.l}" x2="${m.l + iw}" y1="${m.t - 4}" y2="${m.t - 4}" class="strip"/>
-<text class="strip-label" x="${m.l}" y="${m.t - 24}">off the chart ↑ (no ${esc(CONVERSION_LABEL[y === "cps" ? result.secondary : result.primary])}s, or above ${esc(fmtMoney(ymax, currency, 0))})</text>
-<g class="axis">${ticksX.map((v) => `<text x="${X(v).toFixed(1)}" y="${H - 14}" text-anchor="middle">${esc(shortMoney(v, currency))}</text>`).join("")}${ticksY.map((v) => `<text x="${m.l - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${esc(fmtMoney(v, currency, 0))}</text>`).join("")}</g>
-<text class="axis-name" x="${m.l + iw / 2}" y="${H - 1}" text-anchor="middle">lifetime spend (log)</text>
+<text class="strip-label" x="${m.l}" y="${m.t - 24}">off the chart ↑ (no ${esc(CONVERSION_LABEL[y === "cps" ? result.secondary : result.primary])}s, or above ${esc(fmtMoney(ymax, currency, 0))})${outside ? ` · ${outside} outside this view` : ""}</text>
+<g class="axis">${ticksX.map((v) => `<text x="${X(v).toFixed(1)}" y="${H - 14}" text-anchor="middle">${esc(shortMoney(v, currency))}</text>`).join("")}${ticksY.map((v) => `<text x="${m.l - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${esc(fmtMoney(v, currency, ymax - ymin < 20 ? 2 : 0))}</text>`).join("")}</g>
+<text class="axis-name" x="${m.l + iw / 2}" y="${H - 1}" text-anchor="middle">lifetime spend (log)${ylog ? ` · ${esc(yName)} (log)` : ""}</text>
 ${rules.map(([k, label, v]) => `<line class="rule ${k}" x1="${m.l}" x2="${m.l + iw}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text class="rule-label ${k}" x="${m.l + iw + 8}" y="${(Y(v) + 4).toFixed(1)}">${esc(label)}</text>`).join("")}
 ${dots}
 </svg>`;

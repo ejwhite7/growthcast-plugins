@@ -169,3 +169,18 @@ test("stage goals: fixed target CPA, campaign stage assignment, per-stage basis 
 	assert.equal(hold.action, "kill", "CPA 182 is above the stage's own kill line of 90");
 	assert.equal(analyse(data, {}).ads.find((a) => a.id === "hold").action, "hold");
 });
+
+test("renderChart: a view narrows the axes, clips ads outside it and reports them; Y log scale", () => {
+	const r = analyse(metaFixture(), {});
+	const dflt = renderChart(r, "USD");
+	assert.match(dflt, /data-ymax="[\d.]+"/);
+	assert.match(dflt, /data-outside="0"/);
+	const narrow = renderChart(r, "USD", { view: { xmin: 1500, xmax: 3000, ymin: 0, ymax: 100 } });
+	assert.match(narrow, /data-xmin="1500" data-xmax="3000"/);
+	assert.doesNotMatch(narrow, /data-id="revive"/, "a 1000-spend ad is outside the X range");
+	assert.match(narrow, /data-id="scale"/);
+	assert.match(narrow, /outside this view/);
+	const lg = renderChart(r, "USD", { view: { ylog: true } });
+	assert.match(lg, /data-ylog="1"/);
+	assert.match(lg, /CPA \(log\)/);
+});

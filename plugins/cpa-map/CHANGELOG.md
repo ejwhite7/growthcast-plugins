@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 — 2026-10-29
+
+- Chart controls: Fit to data (snap both axes to the matching ads), Show all (zoom out until every matching ad is on),
+  + / − zoom, a log Y axis, Reset, drag a box to zoom, and ⌘/ctrl + wheel. The strip reports how many matching ads sit
+  outside the view. `?zoom=xmin,xmax,ymin,ymax[,log]` deep-links a view.
+
 ## 0.3.0 — 2026-10-29
 
 - Campaign, ad set (ad group) and ad filters are multi-select, with a type-to-find box in each; deep links take

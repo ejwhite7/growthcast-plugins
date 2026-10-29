@@ -9,7 +9,7 @@ import { planSections, readoutSections } from "./report.mjs";
 const $ = (s, el = document) => el.querySelector(s);
 const FILTERS = () => ({ live: "live", format: "all", stage: "all", campaign: [], adset: [], ad: [], y: "cpa", hide: false, q: "" });
 const LISTS = ["campaign", "adset", "ad"]; // multi-select filters: [] = all
-const S = { app: { mode: "local", canEdit: true, asks: [], pdf: false, platforms: { meta: true, google: true } }, projects: [], project: "", connections: [], pickable: { platform: "", list: null, busy: false }, accounts: [], id: null, data: null, settings: null, version: null, result: null, view: "map", filters: FILTERS(), step: 6, selected: null, sort: { key: "action", dir: 1 }, request: null, drawer: false, openMulti: {}, multiQ: {} };
+const S = { app: { mode: "local", canEdit: true, asks: [], pdf: false, platforms: { meta: true, google: true } }, projects: [], project: "", connections: [], pickable: { platform: "", list: null, busy: false }, accounts: [], id: null, data: null, settings: null, version: null, result: null, view: "map", filters: FILTERS(), step: 6, selected: null, sort: { key: "action", dir: 1 }, request: null, drawer: false, openMulti: {}, multiQ: {}, zoom: { x: null, y: null, ylog: false } };
 const STEPS = {
 	0: { title: "Every ad on one map.", sub: "Log lifetime spend across, CPA up. Left half is testing; top right is high spend / high cost; bottom right is where the money is.", filters: { live: "all" } },
 	5: { title: "Not live: turn old winners back on.", sub: "Paused ads under the scale line with 3+ purchases that aren't one-offs (promos, launches). Turn them back on.", filters: { live: "off" } },
@@ -87,12 +87,17 @@ async function loadAccounts() {
 	for (const k of LISTS) if (S.filters[k].length) S.openMulti[k] = true;
 	if (q.get("view")) S.view = q.get("view");
 	if (q.has("settings")) S.drawer = true;
+	if (q.has("zoom")) {
+		const [x0, x1, y0, y1, lg] = q.get("zoom").split(",");
+		S.zoom = { x: +x0 > 0 && +x1 > +x0 ? [+x0, +x1] : null, y: +y1 > 0 ? [Math.max(0, +y0 || 0), +y1] : null, ylog: lg === "log" };
+	}
 	$("#account").innerHTML = S.accounts.map((a) => `<option value="${esc(a.id)}" ${a.id === S.id ? "selected" : ""}>${esc(a.name)} · ${(PLATFORMS[a.platform] ?? PLATFORMS.meta).short} · ${a.building ? "pulling…" : `${a.ads} ads`}</option>`).join("") || `<option>No accounts yet</option>`;
 	if (S.id) await loadAccount();
 	else render();
 }
 async function loadAccount() {
 	const { data, settings, version, building, request } = await api(`api/accounts/${S.id}`);
+	if (S.data && data?.account?.id !== S.data.account?.id) S.zoom = { x: null, y: null, ylog: false }; // a new account starts unzoomed
 	Object.assign(S, { data, settings, version, building: !!building });
 	if (request) S.request = request;
 	if (location.hash !== `#${S.id}`) history.replaceState(null, "", `#${S.id}`);
@@ -275,9 +280,97 @@ function renderStage() {
 	<div class="headline">${S.step ? `<span class="step">Step ${S.step}</span>` : ""}<h1>${esc(title)}</h1></div>
 	<p class="sub">${esc(sub)}</p>
 	<p class="stats"><b>${shown.length} ads</b> · <b>${shown.filter((a) => a.action === "kill").length} kill</b> · <b>${shown.filter((a) => a.action === "scale").length} scale</b> · <b>${shown.filter((a) => a.action === "revive").length} revive</b> · ${esc(yName())} ↑ · filled = live, hollow = not live · ${off.length} off the chart${r.hidden ? ` · ${r.hidden} ads under ${money(S.settings.minSpend)} hidden` : ""} · ${esc(S.data.account.name)} · ${esc(S.data.window.since ?? "lifetime")} → ${esc(S.data.window.until)} · live = spent in the last ${S.data.live.days} days</p>
-	<div class="chart-wrap">${renderChart(r, cur(), { y: f.y, shown: matches, hideOthers: f.hide, selected: S.selected, lines: L })}${LEGEND_HTML}</div>
+	<div class="chart-wrap">${chartTools()}${renderChart(r, cur(), { y: f.y, shown: matches, hideOthers: f.hide, selected: S.selected, lines: L, view: viewNow() })}${LEGEND_HTML}</div>
 	<div class="table-wrap">${table(shown)}</div>`;
 }
+// --- Chart zoom ---
+// The view: null parts mean the chart's defaults (X from the min spend, Y from 0 to the cap line).
+const viewNow = () => ({ xmin: S.zoom.x?.[0] ?? null, xmax: S.zoom.x?.[1] ?? null, ymin: S.zoom.y?.[0] ?? null, ymax: S.zoom.y?.[1] ?? null, ylog: S.zoom.ylog });
+const zoomed = () => !!(S.zoom.x || S.zoom.y || S.zoom.ylog);
+function chartTools() {
+	const b = (k, label, title, on = false) => `<button data-zoom="${k}" title="${esc(title)}" aria-pressed="${on}">${label}</button>`;
+	return `<div class="chart-tools"><span>View</span>${b("fit", "Fit to data", "Snap both axes to the ads that match the filters")}${b("all", "Show all", "Zoom out until every matching ad is on the chart")}${b("in", "+", "Zoom in")}${b("out", "−", "Zoom out")}${b("log", "Y log", "Log scale on the Y axis", S.zoom.ylog)}${zoomed() ? b("reset", "Reset", "Back to the default view: spend from the minimum, Y up to the cap line") : ""}<em>drag a box to zoom · ⌘ or ctrl + wheel</em></div>`;
+}
+function currentScales() {
+	const svg = $("#stage svg.chart");
+	if (!svg) return null;
+	const d = svg.dataset, [pl, pt, pw, ph] = d.plot.split(",").map(Number);
+	return { xmin: +d.xmin, xmax: +d.xmax, ymin: +d.ymin, ymax: +d.ymax, ylog: d.ylog === "1", pl, pt, pw, ph, svg };
+}
+// Pixel (client) → data value, through the svg's viewBox.
+function unproject(sc, clientX, clientY) {
+	const r = sc.svg.getBoundingClientRect(), vb = sc.svg.viewBox.baseVal;
+	const px = ((clientX - r.left) / r.width) * vb.width, py = ((clientY - r.top) / r.height) * vb.height;
+	const fx = Math.min(1, Math.max(0, (px - sc.pl) / sc.pw)), fy = Math.min(1, Math.max(0, 1 - (py - sc.pt) / sc.ph));
+	const x = 10 ** (Math.log10(sc.xmin) + fx * (Math.log10(sc.xmax) - Math.log10(sc.xmin)));
+	const y = sc.ylog ? 10 ** (Math.log10(Math.max(sc.ymin, 1e-9)) + fy * (Math.log10(sc.ymax) - Math.log10(Math.max(sc.ymin, 1e-9)))) : sc.ymin + fy * (sc.ymax - sc.ymin);
+	return { x, y };
+}
+function zoomBy(factor) {
+	const sc = currentScales();
+	if (!sc) return;
+	const lx0 = Math.log10(sc.xmin), lx1 = Math.log10(sc.xmax), cx = (lx0 + lx1) / 2, hw = ((lx1 - lx0) / 2) * factor;
+	const x = [Math.max(1, 10 ** (cx - hw)), 10 ** (cx + hw)];
+	let y;
+	if (sc.ylog) {
+		const ly0 = Math.log10(Math.max(sc.ymin, 1e-9)), ly1 = Math.log10(sc.ymax), cy = (ly0 + ly1) / 2, hh = ((ly1 - ly0) / 2) * factor;
+		y = [10 ** (cy - hh), 10 ** (cy + hh)];
+	} else y = [sc.ymin, sc.ymin + (sc.ymax - sc.ymin) * factor];
+	S.zoom = { ...S.zoom, x, y };
+	renderStage();
+}
+function zoomTo(kind) {
+	const r = S.result;
+	if (kind === "reset") S.zoom = { x: null, y: null, ylog: false };
+	else if (kind === "log") S.zoom = { ...S.zoom, ylog: !S.zoom.ylog };
+	else if (kind === "in") return zoomBy(1 / 1.5);
+	else if (kind === "out") return zoomBy(1.5);
+	else {
+		const ads = r.ads.filter(matches), ys = ads.map(yOf).filter((v) => v != null && v > 0);
+		if (!ads.length) return toast("No ads match the filters.");
+		if (kind === "fit") {
+			const xs = ads.map((a) => a.spend);
+			S.zoom = { ...S.zoom, x: [Math.max(1, Math.min(...xs) / 1.15), Math.max(...xs) * 1.15], y: ys.length ? [S.zoom.ylog ? Math.min(...ys) / 1.15 : 0, Math.max(...ys) * 1.08] : null };
+		} else if (kind === "all") S.zoom = { ...S.zoom, x: null, y: ys.length ? [0, Math.max(...ys) * 1.05] : null };
+	}
+	renderStage();
+}
+// Drag a box on the chart to zoom to it.
+let drag = null;
+document.addEventListener("mousedown", (e) => {
+	const svg = e.target.closest?.("#stage svg.chart");
+	if (!svg || e.button !== 0 || e.target.closest(".dot")) return;
+	const sc = currentScales();
+	if (!sc) return;
+	const wrap = svg.closest(".chart-wrap"), box = document.createElement("div");
+	box.className = "zoom-box";
+	wrap.appendChild(box);
+	drag = { sc, x0: e.clientX, y0: e.clientY, box, wrap };
+	e.preventDefault();
+});
+document.addEventListener("mousemove", (e) => {
+	if (!drag) return;
+	const w = drag.wrap.getBoundingClientRect();
+	const x = Math.min(drag.x0, e.clientX) - w.left, y = Math.min(drag.y0, e.clientY) - w.top;
+	Object.assign(drag.box.style, { left: `${x}px`, top: `${y}px`, width: `${Math.abs(e.clientX - drag.x0)}px`, height: `${Math.abs(e.clientY - drag.y0)}px` });
+});
+document.addEventListener("mouseup", (e) => {
+	if (!drag) return;
+	const { sc, x0, y0, box } = drag;
+	drag = null;
+	box.remove();
+	if (Math.abs(e.clientX - x0) < 8 || Math.abs(e.clientY - y0) < 8) return;
+	const a = unproject(sc, Math.min(x0, e.clientX), Math.max(y0, e.clientY)), b = unproject(sc, Math.max(x0, e.clientX), Math.min(y0, e.clientY));
+	if (!(b.x > a.x && b.y > a.y)) return;
+	S.zoom = { ...S.zoom, x: [a.x, b.x], y: [sc.ylog ? Math.max(a.y, 1e-6) : a.y, b.y] };
+	renderStage();
+});
+document.addEventListener("wheel", (e) => {
+	if (!(e.ctrlKey || e.metaKey) || !e.target.closest?.("#stage svg.chart")) return;
+	e.preventDefault();
+	zoomBy(e.deltaY > 0 ? 1.25 : 1 / 1.25);
+}, { passive: false });
+
 function table(shown) {
 	const { key, dir } = S.sort, r = S.result;
 	const val = (a) => ({ action: ACTION_ORDER[a.action], name: a.name.toLowerCase(), format: a.format, stage: a.stage, spend: a.spend, conv: a.conv, cpa: a.cpa ?? Infinity, sec: a.sec, cps: a.cps ?? Infinity, spendLive: a.spendLive }[key]);
@@ -369,11 +462,12 @@ function drawer() {
 
 // --- Events ---
 document.addEventListener("click", (e) => {
-	const t = e.target.closest("[data-multi],[data-multi-clear],[data-filter],[data-step],[data-id],[data-ask],[data-decide],[data-act],[data-sort],[data-view],#toggleLeft,#toggleRight,#settingsBtn,#exportBtn,#refreshBtn");
+	const t = e.target.closest("[data-zoom],[data-multi],[data-multi-clear],[data-filter],[data-step],[data-id],[data-ask],[data-decide],[data-act],[data-sort],[data-view],#toggleLeft,#toggleRight,#settingsBtn,#exportBtn,#refreshBtn");
 	if (!t) {
 		if (!e.target.closest("#exportMenu")) $("#exportMenu").hidden = true;
 		return;
 	}
+	if (t.dataset.zoom) return zoomTo(t.dataset.zoom);
 	if (t.dataset.multi) {
 		const k = t.dataset.multi, set = new Set(S.filters[k]);
 		t.checked ? set.add(t.value) : set.delete(t.value);

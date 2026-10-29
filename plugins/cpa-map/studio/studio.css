@@ -101,7 +101,14 @@ aside { background: var(--panel); overflow-y: auto; }
 .sub { color: var(--muted); margin: 0 0 10px; max-width: 900px; }
 .stats { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
 .stats b { color: var(--fg); font-weight: 500; }
-.chart-wrap { background: var(--card); border: 1px solid var(--line); padding: 10px 10px 4px; }
+.chart-wrap { background: var(--card); border: 1px solid var(--line); padding: 6px 10px 4px; position: relative; }
+.chart-wrap svg.chart { cursor: crosshair; user-select: none; }
+.chart-tools { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 4px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.chart-tools span { margin-right: 4px; letter-spacing: .04em; text-transform: uppercase; }
+.chart-tools button { padding: 2px 8px; font-size: 11px; border-color: var(--line-2); min-width: 26px; }
+.chart-tools button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.chart-tools em { font-style: normal; margin-left: auto; opacity: .8; }
+.zoom-box { position: absolute; border: 1px dashed var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); pointer-events: none; }
 svg.chart .dot.sel circle.mark { stroke-width: 3; }
 .empty { color: var(--muted); padding: 40px 0; text-align: center; max-width: 560px; margin: 0 auto; }
 .empty code { font-family: var(--mono); background: var(--accent-soft); padding: 2px 5px; }

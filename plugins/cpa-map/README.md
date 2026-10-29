@@ -8,6 +8,7 @@ A Claude Code plugin that puts every Meta or Google ad on one map and works the 
   find box, and a switch to hide everything outside the filters instead of fading it.
 - **Goals:** the target as a % under the account CPA or a fixed CPA; per stage, the conversion it is graded on and its
   own target (kill and scale lines follow); campaign-level stage assignment over the name tags, per-ad overrides on top.
+- **Chart controls:** fit to data, show all, zoom in and out, log Y, drag a box to zoom, ⌘/ctrl + wheel, reset.
 - **Steps:** turn paused winners back on · kill and scale what's live · compare like with like by format · grade each stage on its own metric.
 - Every ad gets a call (kill, scale, revive, testing, hold) with the number behind it; the inspector fixes tags or overrules the rule.
 - **Actions** and **Readout** views, generated from the numbers. **Export:** HTML report, GrowthCast slide deck, slides PDF,
