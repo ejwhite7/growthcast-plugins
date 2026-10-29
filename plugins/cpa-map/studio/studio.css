@@ -101,6 +101,15 @@ aside { background: var(--panel); overflow-y: auto; }
 .sub { color: var(--muted); margin: 0 0 10px; max-width: 900px; }
 .stats { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
 .stats b { color: var(--fg); font-weight: 500; }
+.crumbs { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 10px; flex-wrap: wrap; }
+.crumbs nav { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11.5px; min-width: 0; }
+.crumbs nav button { padding: 3px 8px; font-size: 11.5px; border-color: var(--line-2); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crumbs nav button[aria-current="page"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.crumbs nav i { font-style: normal; color: var(--muted); }
+.crumbs nav span { color: var(--muted); }
+.crumbs .seg.level { margin: 0; }
+.crumbs .seg.level button { padding: 4px 10px; }
+.ads td .drill { padding: 1px 8px; font-size: 14px; line-height: 1; }
 .chart-wrap { background: var(--card); border: 1px solid var(--line); padding: 6px 10px 4px; position: relative; }
 .chart-wrap svg.chart { cursor: crosshair; user-select: none; }
 .chart-tools { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-bottom: 4px; font-family: var(--mono); font-size: 11px; color: var(--muted); }

@@ -51,6 +51,9 @@ finds the rows wherever they sit in the JSON.
    - `last30.json`: the same call with `"date_preset":"last_30d"` (this decides live / not live).
    - `last7.json`: the same with `"date_preset":"last_7d"` (shown in the inspector).
    - `campaigns.json`: `facebook_ads.list_facebook_campaigns` with `{"ad_account_id":"<act_id>","effective_status":["ACTIVE","PAUSED","ARCHIVED","WITH_ISSUES"]}`.
+   - `ads.json`: `facebook_ads.list_facebook_ads` for the account with `id`, `status`, `effective_status` and, if the tool
+     takes fields, `adset{effective_status}` and `campaign{effective_status}`. Delivery status decides live: an ad in a
+     paused campaign or ad set is not live even when it spent this month. Without this file, spend alone decides.
 3. Build: `node "<tools>/cpamap.mjs" build <act_id> --name "<account name>" --currency <USD|CAD|…> --timezone "<tz>"`.
 
 ### Google Ads (`gads_<customer id>`)
@@ -61,7 +64,7 @@ finds the rows wherever they sit in the JSON.
    A `USER_PERMISSION_DENIED` on an id means the connection can't read it; say so rather than retrying.
 2. Create `~/.cpa-map/raw/gads_<customer id>/` and save these `google_ads.execute_query` results (they can go in one
    batched execute; `customer_id` is the child account, digits only):
-   - `lifetime.json`: `SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status, ad_group.id, ad_group.name, ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.ad.type, ad_group_ad.status, ad_group_ad.ad.final_urls, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value, metrics.all_conversions FROM ad_group_ad WHERE metrics.cost_micros > 0 ORDER BY metrics.cost_micros DESC`
+   - `lifetime.json`: `SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status, ad_group.id, ad_group.name, ad_group.status, ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.ad.type, ad_group_ad.status, ad_group_ad.ad.final_urls, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value, metrics.all_conversions FROM ad_group_ad WHERE metrics.cost_micros > 0 ORDER BY metrics.cost_micros DESC`
      (no date clause = all time; the tool returns up to 10,000 rows and sets `truncated` when more exist: then split by
      `campaign.status` or by yearly `segments.date BETWEEN` windows and save as `lifetime-<n>.json`).
    - `last30.json`: `SELECT ad_group_ad.ad.id, campaign.id, ad_group.id, metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions, metrics.conversions_value FROM ad_group_ad WHERE metrics.cost_micros > 0 AND segments.date DURING LAST_30_DAYS`

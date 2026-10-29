@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — 2026-10-29
+
+- **Live means delivering.** An ad is live only when it spent in the live window and nothing above it is paused.
+  Meta pulls now fetch every ad's status with its ad set's and campaign's (`ads.json` locally; the Graph API through
+  Composio on the portal); Google pulls add `ad_group.status`. Ads in a paused campaign or ad set are not live, so
+  they become revive candidates instead of kills and holds, and their reason says what is paused.
+- **Drill-down.** The map opens at the campaign level: one dot and one row per campaign, graded on its totals with
+  its ads' calls counted. Open a campaign to see its ad sets (ad groups), an ad set to see its ads. Breadcrumbs and a
+  Campaigns / Ad sets / Ads switch sit above the chart; the playbook steps work at the ad level. `?level=` deep-links.
+
 ## 0.3.1 — 2026-10-29
 
 - Chart controls: Fit to data (snap both axes to the matching ads), Show all (zoom out until every matching ad is on),

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { actionCount, actionRows, analyse, buildGoogle, buildMeta, compareGroups, mergeRows, rowsOf, tagFormat, tagGoogleFormat, tagStage, toCsv } from "../studio/model.mjs";
+import { actionCount, actionRows, analyse, buildGoogle, buildMeta, compareGroups, mergeRows, rollup, rowsOf, tagFormat, tagGoogleFormat, tagStage, toCsv } from "../studio/model.mjs";
 import { actionPlanMarkdown, auditMarkdown, narrative } from "../studio/narrative.mjs";
 import { renderChart } from "../studio/chart.mjs";
 import { renderReport } from "../studio/report.mjs";
@@ -183,4 +183,41 @@ test("renderChart: a view narrows the axes, clips ads outside it and reports the
 	const lg = renderChart(r, "USD", { view: { ylog: true } });
 	assert.match(lg, /data-ylog="1"/);
 	assert.match(lg, /CPA \(log\)/);
+});
+
+test("live needs delivery: a paused campaign or ad set takes its ads out of live even when they spent this month", () => {
+	const data = metaFixture();
+	// Statuses: the kill ad's campaign is paused, the hold ad's ad set is paused, everything else delivers.
+	const statuses = data.ads.map((a) => ({ id: a.id, status: "ACTIVE", effective_status: "ACTIVE", adset: { effective_status: a.id === "hold" ? "PAUSED" : "ACTIVE" }, campaign: { effective_status: a.id === "kill" ? "PAUSED" : "ACTIVE" } }));
+	const rebuilt = buildMeta({ account: data.account, lifetime: [], live: [], statuses });
+	assert.equal(rebuilt.ads.length, 0, "statuses alone add no ads");
+	const withStatus = { ...data, ads: data.ads.map((a) => ({ ...a, campaignStatus: a.id === "kill" ? "PAUSED" : "ACTIVE", adsetStatus: a.id === "hold" ? "PAUSED" : "ACTIVE", status: "ACTIVE" })) };
+	const r = analyse(withStatus, {});
+	const kill = r.ads.find((a) => a.id === "kill"), hold = r.ads.find((a) => a.id === "hold"), scale = r.ads.find((a) => a.id === "scale");
+	assert.equal(kill.live, false);
+	assert.equal(kill.paused, "campaign");
+	assert.notEqual(kill.action, "kill", "a paused campaign's ad is not a live kill");
+	assert.match(kill.reason, /campaign paused/);
+	assert.equal(hold.live, false);
+	assert.equal(hold.paused, "ad set");
+	assert.equal(scale.live, true);
+	assert.equal(analyse(data, {}).ads.find((a) => a.id === "kill").live, true, "without statuses, spend decides");
+});
+
+test("rollup: campaigns and ad sets graded like ads, with their ads' calls counted", () => {
+	const r = analyse(metaFixture(), {});
+	const camps = rollup(r, "campaign");
+	assert.equal(camps.length, 2);
+	const c1 = camps.find((c) => c.key === "c1"), c2 = camps.find((c) => c.key === "c2");
+	assert.equal(c1.kind, "campaign");
+	assert.equal(c1.ads, r.ads.filter((a) => a.campaignId === "c1").length);
+	assert.equal(c1.spend, r.ads.filter((a) => a.campaignId === "c1").reduce((t, a) => t + a.spend, 0));
+	assert.equal(c1.counts.kill, r.ads.filter((a) => a.campaignId === "c1" && a.action === "kill").length);
+	assert.ok(c1.live);
+	assert.equal(c2.live, false, "c2's only ad is paused");
+	assert.equal(c2.action, "revive", "the paused campaign has 12 purchases under the scale line");
+	const sets = rollup(r, "adset", r.ads.filter((a) => a.campaignId === "c2"));
+	assert.equal(sets.length, 1);
+	assert.equal(sets[0].id, "adset:as2");
+	assert.equal(sets[0].campaignName, "[US] RT | Visitors");
 });

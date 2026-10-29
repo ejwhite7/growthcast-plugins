@@ -87,7 +87,7 @@ export function rawFiles(id) {
 	const dir = join(rawDir, okAccountId(id) ?? "_");
 	const files = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith(".json")) : [];
 	const pick = (re) => files.filter((f) => re.test(f)).map((f) => join(dir, f));
-	return { dir, platform: platformOf(id), lifetime: pick(/^lifetime.*\.json$/), live: pick(/^(last30|live)\.json$/), last7: pick(/^last7\.json$/), conversions: pick(/^conversions\.json$/), campaigns: pick(/^campaigns\.json$/), account: pick(/^account\.json$/) };
+	return { dir, platform: platformOf(id), lifetime: pick(/^lifetime.*\.json$/), live: pick(/^(last30|live)\.json$/), last7: pick(/^last7\.json$/), conversions: pick(/^conversions\.json$/), statuses: pick(/^ads\.json$/), campaigns: pick(/^campaigns\.json$/), account: pick(/^account\.json$/) };
 }
 export function build(id, { name, currency, timezone, liveDays } = {}) {
 	if (!okAccountId(id)) throw fail(400, `"${id}" isn't an account id (act_<digits> for Meta, gads_<digits> for Google Ads)`);
@@ -109,8 +109,8 @@ export function build(id, { name, currency, timezone, liveDays } = {}) {
 		data = buildGoogle({ account, lifetime, live, last7, conversions, campaigns, liveDays: days });
 		counts = { lifetimeRows: lifetime.length, liveRows: live.length, last7Rows: last7.length, conversionRows: conversions.length, campaigns: campaigns.length };
 	} else {
-		const lifetime = mergeRows(f.lifetime.map(rows)), live = mergeRows(f.live.map(rows)), last7 = mergeRows(f.last7.map(rows)), campaigns = f.campaigns.length ? rows(f.campaigns[0]) : [];
-		data = buildMeta({ account, lifetime, live, last7, campaigns, liveDays: days });
+		const lifetime = mergeRows(f.lifetime.map(rows)), live = mergeRows(f.live.map(rows)), last7 = mergeRows(f.last7.map(rows)), campaigns = f.campaigns.length ? rows(f.campaigns[0]) : [], statuses = f.statuses.flatMap(rows);
+		data = buildMeta({ account, lifetime, live, last7, campaigns, statuses, liveDays: days });
 		counts = { lifetimeRows: lifetime.length, liveRows: live.length, last7Rows: last7.length, campaigns: campaigns.length };
 	}
 	writeAtomic(dataPath(id), JSON.stringify(data, null, "\t"));

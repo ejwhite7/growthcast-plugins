@@ -3,13 +3,13 @@
 // manual calls, the generated action plan and readout, and exports. Settings save to the server and the chart
 // recomputes locally. The same app runs in the GrowthCast client portal ("web mode"), so every API path is relative.
 import { renderChart, CHART_CSS, LEGEND_HTML } from "./chart.mjs";
-import { ACTION_LABEL, ACTION_ORDER, CONVERSIONS, CONVERSION_LABEL, FORMAT_LABEL, PLATFORMS, STAGES, STAGE_LABEL, analyse, esc, fmtInt, fmtMoney } from "./model.mjs";
+import { ACTION_LABEL, ACTION_ORDER, CONVERSIONS, CONVERSION_LABEL, FORMAT_LABEL, PLATFORMS, STAGES, STAGE_LABEL, analyse, esc, fmtInt, fmtMoney, rollup } from "./model.mjs";
 import { planSections, readoutSections } from "./report.mjs";
 
 const $ = (s, el = document) => el.querySelector(s);
 const FILTERS = () => ({ live: "live", format: "all", stage: "all", campaign: [], adset: [], ad: [], y: "cpa", hide: false, q: "" });
 const LISTS = ["campaign", "adset", "ad"]; // multi-select filters: [] = all
-const S = { app: { mode: "local", canEdit: true, asks: [], pdf: false, platforms: { meta: true, google: true } }, projects: [], project: "", connections: [], pickable: { platform: "", list: null, busy: false }, accounts: [], id: null, data: null, settings: null, version: null, result: null, view: "map", filters: FILTERS(), step: 6, selected: null, sort: { key: "action", dir: 1 }, request: null, drawer: false, openMulti: {}, multiQ: {}, zoom: { x: null, y: null, ylog: false } };
+const S = { app: { mode: "local", canEdit: true, asks: [], pdf: false, platforms: { meta: true, google: true } }, projects: [], project: "", connections: [], pickable: { platform: "", list: null, busy: false }, accounts: [], id: null, data: null, settings: null, version: null, result: null, view: "map", filters: { ...FILTERS(), live: "all" }, step: null, level: "campaign", items: [], selected: null, sort: { key: "action", dir: 1 }, request: null, drawer: false, openMulti: {}, multiQ: {}, zoom: { x: null, y: null, ylog: false } };
 const STEPS = {
 	0: { title: "Every ad on one map.", sub: "Log lifetime spend across, CPA up. Left half is testing; top right is high spend / high cost; bottom right is where the money is.", filters: { live: "all" } },
 	5: { title: "Not live: turn old winners back on.", sub: "Paused ads under the scale line with 3+ purchases that aren't one-offs (promos, launches). Turn them back on.", filters: { live: "off" } },
@@ -86,6 +86,7 @@ async function loadAccounts() {
 	}
 	for (const k of LISTS) if (S.filters[k].length) S.openMulti[k] = true;
 	if (q.get("view")) S.view = q.get("view");
+	if (["campaign", "adset", "ad"].includes(q.get("level"))) S.level = q.get("level");
 	if (q.has("settings")) S.drawer = true;
 	if (q.has("zoom")) {
 		const [x0, x1, y0, y1, lg] = q.get("zoom").split(",");
@@ -181,6 +182,7 @@ const yName = () => (S.filters.y === "cps" ? `cost per ${CONVERSION_LABEL[S.resu
 function applyStep(n, rerender = true) {
 	const st = STEPS[n];
 	S.step = n;
+	S.level = "ad";
 	S.filters = { ...FILTERS(), ...st.filters, hide: S.filters.hide };
 	if (S.filters.format === "first") S.filters.format = S.result?.formats.find((f) => f !== "unknown" && S.result.ads.some((a) => a.format === f)) ?? "all";
 	if (S.filters.y === "cps" && !S.result?.secondary) S.filters.y = "cpa";
@@ -272,16 +274,49 @@ function renderStage() {
 	if (S.view === "readout") return (stage.innerHTML = `<div class="doc"><div class="headline"><h1>${esc(S.data.account.name)}: account readout</h1></div><p class="sub">The audit the exports carry: the lines, where the spend sits, like-with-like comparisons, paused winners, caveats.</p>${readoutSections(r, S.data)}</div>`);
 	const step = STEPS[S.step] ?? null;
 	const shown = r.ads.filter(matches);
+	const level = S.level, [, adsetWord] = level_();
+	// Campaign and ad-set levels show one dot per group, built from the ads that match the filters.
+	const items = level === "ad" ? shown : rollup(r, level, shown);
+	S.items = items;
+	const chartResult = level === "ad" ? r : { ...r, ads: items };
 	const L = linesNow();
-	const off = shown.filter((a) => yOf(a) == null || yOf(a) > L.cap);
-	const title = step ? step.title : "Filtered view";
-	const sub = step ? step.sub : `${[f.live !== "all" ? (f.live === "live" ? "live" : "not live") : "", f.format !== "all" ? FORMAT_LABEL[f.format] : "", f.stage !== "all" ? STAGE_LABEL[f.stage] : "", f.campaign.map((id) => r.campaigns.find((c) => c.id === id)?.name ?? id).join(", "), f.adset.map((id) => r.adsets.find((g) => g.id === id)?.name ?? id).join(", "), f.ad.length ? `${f.ad.length} chosen ad${f.ad.length > 1 ? "s" : ""}` : "", f.q ? `“${f.q}”` : ""].filter(Boolean).join(" · ") || "every ad on the map"}.`;
+	const off = items.filter((a) => yOf(a) == null || yOf(a) > L.cap);
+	const title = step ? step.title : level === "ad" ? "Ads" : level === "adset" ? `${adsetWord}s` : "Campaigns";
+	const sub = step ? step.sub : `${[f.live !== "all" ? (f.live === "live" ? "live" : "not live") : "", f.format !== "all" ? FORMAT_LABEL[f.format] : "", f.stage !== "all" ? STAGE_LABEL[f.stage] : "", f.campaign.map((id) => r.campaigns.find((c) => c.id === id)?.name ?? id).join(", "), f.adset.map((id) => r.adsets.find((g) => g.id === id)?.name ?? id).join(", "), f.ad.length ? `${f.ad.length} chosen ad${f.ad.length > 1 ? "s" : ""}` : "", f.q ? `“${f.q}”` : ""].filter(Boolean).join(" · ") || (level === "ad" ? "every ad on the map" : `every ${level === "adset" ? adsetWord.toLowerCase() : "campaign"} with ads on the map`)}. ${level === "ad" ? "Click a dot or row for its numbers; call it by hand in the inspector." : "Each dot is a whole group, graded on its totals. Click one to see it; use › to drill into it."}`;
+	const noun = level === "ad" ? "ads" : level === "adset" ? `${adsetWord.toLowerCase()}s` : "campaigns";
 	stage.innerHTML = `
+	${crumbs()}
 	<div class="headline">${S.step ? `<span class="step">Step ${S.step}</span>` : ""}<h1>${esc(title)}</h1></div>
 	<p class="sub">${esc(sub)}</p>
-	<p class="stats"><b>${shown.length} ads</b> · <b>${shown.filter((a) => a.action === "kill").length} kill</b> · <b>${shown.filter((a) => a.action === "scale").length} scale</b> · <b>${shown.filter((a) => a.action === "revive").length} revive</b> · ${esc(yName())} ↑ · filled = live, hollow = not live · ${off.length} off the chart${r.hidden ? ` · ${r.hidden} ads under ${money(S.settings.minSpend)} hidden` : ""} · ${esc(S.data.account.name)} · ${esc(S.data.window.since ?? "lifetime")} → ${esc(S.data.window.until)} · live = spent in the last ${S.data.live.days} days</p>
-	<div class="chart-wrap">${chartTools()}${renderChart(r, cur(), { y: f.y, shown: matches, hideOthers: f.hide, selected: S.selected, lines: L, view: viewNow() })}${LEGEND_HTML}</div>
-	<div class="table-wrap">${table(shown)}</div>`;
+	<p class="stats"><b>${items.length} ${noun}</b>${level !== "ad" ? ` (${shown.length} ads)` : ""} · <b>${items.filter((a) => a.action === "kill").length} kill</b> · <b>${items.filter((a) => a.action === "scale").length} scale</b> · <b>${items.filter((a) => a.action === "revive").length} revive</b> · ${esc(yName())} ↑ · filled = live, hollow = not live · ${off.length} off the chart${r.hidden ? ` · ${r.hidden} ads under ${money(S.settings.minSpend)} hidden` : ""} · ${esc(S.data.account.name)} · ${esc(S.data.window.since ?? "lifetime")} → ${esc(S.data.window.until)} · live = delivering now and spent in the last ${S.data.live.days} days</p>
+	<div class="chart-wrap">${chartTools()}${renderChart(chartResult, cur(), { y: f.y, shown: level === "ad" ? matches : () => true, hideOthers: f.hide, selected: S.selected, lines: L, view: viewNow() })}${LEGEND_HTML}</div>
+	<div class="table-wrap">${table(items)}</div>`;
+}
+const level_ = () => (PLATFORMS[S.result?.platform ?? "meta"] ?? PLATFORMS.meta).level;
+// Campaigns › campaign › ad set, plus the level switch. Each crumb resets the filters below it.
+function crumbs() {
+	const r = S.result, f = S.filters, [, adsetWord] = level_();
+	const camp = f.campaign.length === 1 ? r.campaigns.find((c) => c.id === f.campaign[0]) : null;
+	const set = f.adset.length === 1 ? r.adsets.find((g) => g.id === f.adset[0]) : null;
+	const parts = [`<button data-crumb="campaign" ${S.level === "campaign" && !f.campaign.length ? 'aria-current="page"' : ""}>All campaigns</button>`];
+	if (camp) parts.push(`<button data-crumb="adset" ${S.level === "adset" && !f.adset.length ? 'aria-current="page"' : ""} title="${esc(camp.name)}">${esc(camp.name)}</button>`);
+	else if (f.campaign.length > 1) parts.push(`<span>${f.campaign.length} campaigns</span>`);
+	if (set) parts.push(`<button data-crumb="ad" ${S.level === "ad" ? 'aria-current="page"' : ""} title="${esc(set.name)}">${esc(set.name)}</button>`);
+	else if (f.adset.length > 1) parts.push(`<span>${f.adset.length} ${esc(adsetWord.toLowerCase())}s</span>`);
+	const seg = [["campaign", "Campaigns"], ["adset", `${adsetWord}s`], ["ad", "Ads"]].map(([v, l]) => `<button data-level="${v}" aria-pressed="${S.level === v}">${esc(l)}</button>`).join("");
+	return `<div class="crumbs"><nav aria-label="Drill-down">${parts.join('<i aria-hidden="true">›</i>')}</nav><div class="seg level" role="group" aria-label="Level">${seg}</div></div>`;
+}
+// Drill into one campaign or ad set: filter to it and go one level down.
+function drill(id) {
+	const g = S.items.find((x) => x.id === id);
+	if (!g?.kind) return;
+	if (g.kind === "campaign") Object.assign(S.filters, { campaign: [g.key], adset: [], ad: [] });
+	else Object.assign(S.filters, { campaign: [g.campaignId], adset: [g.key], ad: [] });
+	S.level = g.kind === "campaign" ? "adset" : "ad";
+	S.step = null;
+	S.selected = null;
+	S.openMulti[g.kind === "campaign" ? "campaign" : "adset"] = true;
+	render();
 }
 // --- Chart zoom ---
 // The view: null parts mean the chart's defaults (X from the min spend, Y from 0 to the cap line).
@@ -371,19 +406,31 @@ document.addEventListener("wheel", (e) => {
 	zoomBy(e.deltaY > 0 ? 1.25 : 1 / 1.25);
 }, { passive: false });
 
-function table(shown) {
-	const { key, dir } = S.sort, r = S.result;
-	const val = (a) => ({ action: ACTION_ORDER[a.action], name: a.name.toLowerCase(), format: a.format, stage: a.stage, spend: a.spend, conv: a.conv, cpa: a.cpa ?? Infinity, sec: a.sec, cps: a.cps ?? Infinity, spendLive: a.spendLive }[key]);
-	const rows = [...shown].sort((a, b) => (val(a) > val(b) ? 1 : val(a) < val(b) ? -1 : b.spend - a.spend) * dir);
+function table(items) {
+	const { key, dir } = S.sort, r = S.result, level = S.level, [, adsetWord] = level_();
+	const val = (a) => ({ action: ACTION_ORDER[a.action], name: a.name.toLowerCase(), format: a.format, stage: a.stage, spend: a.spend, conv: a.conv, cpa: a.cpa ?? Infinity, sec: a.sec, cps: a.cps ?? Infinity, spendLive: a.spendLive, ads: a.ads ?? 1 }[key]);
+	const rows = [...items].sort((a, b) => (val(a) > val(b) ? 1 : val(a) < val(b) ? -1 : b.spend - a.spend) * dir);
 	const th = (k, label, num) => `<th class="${num ? "num" : ""}" data-sort="${k}">${label}${key === k ? (dir > 0 ? " ↑" : " ↓") : ""}</th>`;
-	return `<table class="ads"><thead><tr>${th("action", "Call")}${th("name", "Ad")}${th("format", "Format")}${th("stage", "Stage")}${th("spend", "Spend", 1)}${th("conv", CONVERSION_LABEL[r.primary] + "s", 1)}${th("cpa", "CPA", 1)}${r.secondary ? th("sec", CONVERSION_LABEL[r.secondary] + "s", 1) + th("cps", "Cost / " + CONVERSION_LABEL[r.secondary], 1) : ""}${th("spendLive", `Spend ${S.data.live.days}d`, 1)}</tr></thead>
-	<tbody>${rows.slice(0, 600).map((a) => `<tr class="row ${a.id === S.selected ? "sel" : ""}" data-id="${esc(a.id)}"><td><span class="pill ${a.action}">${ACTION_LABEL[a.action]}</span>${a.manual ? " ✎" : ""}</td><td><span class="name" title="${esc(a.name)}">${esc(a.name)}</span><span class="camp" title="${esc(a.campaignName)}">${esc(a.campaignName)}${a.adsetName ? " · " + esc(a.adsetName) : ""}</span></td><td>${FORMAT_LABEL[a.format] ?? a.format}</td><td><span class="fun fun-${a.stage}">${STAGE_LABEL[a.stage]}</span></td><td class="num">${money(a.spend)}</td><td class="num">${fmtInt(a.conv)}</td><td class="num">${a.cpa == null ? "—" : money(a.cpa)}</td>${r.secondary ? `<td class="num">${fmtInt(a.sec)}</td><td class="num">${a.cps == null ? "—" : money(a.cps)}</td>` : ""}<td class="num">${a.spendLive ? money(a.spendLive) : "—"}</td></tr>`).join("") || `<tr><td colspan="10" class="empty">No ads match these filters.</td></tr>`}</tbody></table>${rows.length > 600 ? `<p class="muted small">Showing 600 of ${rows.length}. Narrow the filters or use the CSV.</p>` : ""}`;
+	const nameHead = level === "ad" ? "Ad" : level === "adset" ? adsetWord : "Campaign";
+	const path = (a) => (level === "ad" ? `${esc(a.campaignName)}${a.adsetName ? " · " + esc(a.adsetName) : ""}` : level === "adset" ? esc(a.campaignName) : `${a.campaignStatus ? esc(String(a.campaignStatus).toLowerCase()) : ""}`);
+	const calls = (a) => ["kill", "scale", "revive"].filter((k) => a.counts?.[k]).map((k) => `<span class="pill ${k}">${a.counts[k]}</span>`).join(" ") || "—";
+	return `<table class="ads"><thead><tr>${th("action", "Call")}${th("name", nameHead)}${level !== "ad" ? th("ads", "Ads", 1) : ""}${th("format", "Format")}${th("stage", "Stage")}${th("spend", "Spend", 1)}${th("conv", CONVERSION_LABEL[r.primary] + "s", 1)}${th("cpa", "CPA", 1)}${r.secondary ? th("sec", CONVERSION_LABEL[r.secondary] + "s", 1) + th("cps", "Cost / " + CONVERSION_LABEL[r.secondary], 1) : ""}${th("spendLive", `Spend ${S.data.live.days}d`, 1)}${level !== "ad" ? `<th>Ad calls</th><th></th>` : ""}</tr></thead>
+	<tbody>${rows.slice(0, 600).map((a) => `<tr class="row ${a.id === S.selected ? "sel" : ""}" data-id="${esc(a.id)}"><td><span class="pill ${a.action}">${ACTION_LABEL[a.action]}</span>${a.manual ? " ✎" : ""}${a.paused && a.live === false && a.action !== "revive" ? `<span class="muted small"> · ${esc(a.paused)} paused</span>` : ""}</td><td><span class="name" title="${esc(a.name)}">${esc(a.name)}</span><span class="camp" title="${esc(a.campaignName)}">${path(a)}</span></td>${level !== "ad" ? `<td class="num">${a.liveAds}/${a.ads}</td>` : ""}<td>${FORMAT_LABEL[a.format] ?? a.format}</td><td><span class="fun fun-${a.stage}">${STAGE_LABEL[a.stage]}</span></td><td class="num">${money(a.spend)}</td><td class="num">${fmtInt(a.conv)}</td><td class="num">${a.cpa == null ? "—" : money(a.cpa)}</td>${r.secondary ? `<td class="num">${fmtInt(a.sec)}</td><td class="num">${a.cps == null ? "—" : money(a.cps)}</td>` : ""}<td class="num">${a.spendLive ? money(a.spendLive) : "—"}</td>${level !== "ad" ? `<td>${calls(a)}</td><td><button class="quiet drill" data-act="drill" data-id="${esc(a.id)}" title="Open its ${level === "campaign" ? adsetWord.toLowerCase() + "s" : "ads"}">›</button></td>` : ""}</tr>`).join("") || `<tr><td colspan="12" class="empty">Nothing matches these filters.</td></tr>`}</tbody></table>${rows.length > 600 ? `<p class="muted small">Showing 600 of ${rows.length}. Narrow the filters or use the CSV.</p>` : ""}`;
 }
 function renderInspector() {
 	const el = $("#inspector");
 	if (!S.result) return (el.innerHTML = "");
-	const r = S.result, a = r.ads.find((x) => x.id === S.selected);
+	const r = S.result, a = r.ads.find((x) => x.id === S.selected), g = S.items.find((x) => x.id === S.selected && x.kind);
 	const [, adsetWord] = level();
+	if (g) {
+		const next = g.kind === "campaign" ? `${adsetWord.toLowerCase()}s` : "ads";
+		return (el.innerHTML = `<h2>${esc(g.name)}</h2><div class="path">${g.kind === "campaign" ? "Campaign" : adsetWord}${g.kind === "adset" ? ` · ${esc(g.campaignName)}` : ""}${g.campaignStatus ? ` · campaign ${esc(String(g.campaignStatus).toLowerCase())}` : ""}${g.adsetStatus ? ` · ${esc(adsetWord.toLowerCase())} ${esc(String(g.adsetStatus).toLowerCase())}` : ""}</div>
+	<span class="pill ${g.action}">${ACTION_LABEL[g.action]}</span><p class="reason">${esc(g.reason)}</p>
+	<dl class="kv"><dt>Ads on the map</dt><dd>${g.liveAds} live / ${g.ads}</dd><dt>Lifetime spend</dt><dd>${money(g.spend)}</dd><dt>${CONVERSION_LABEL[r.primary]}s</dt><dd>${fmtInt(g.conv)}</dd><dt>CPA</dt><dd>${g.cpa == null ? "—" : money(g.cpa)}</dd>${r.secondary ? `<dt>${CONVERSION_LABEL[r.secondary]}s</dt><dd>${fmtInt(g.sec)}</dd><dt>Cost / ${CONVERSION_LABEL[r.secondary]}</dt><dd>${g.cps == null ? "—" : money(g.cps)}</dd>` : ""}<dt>Spend last ${S.data.live.days}d</dt><dd>${g.spendLive ? money(g.spendLive) : "—"}</dd><dt>Spend last 7d</dt><dd>${g.spend7 ? money(g.spend7) : "—"}</dd><dt>Clicks / impr.</dt><dd>${fmtInt(g.clicks)} / ${fmtInt(g.impressions)}</dd><dt>Mostly</dt><dd>${FORMAT_LABEL[g.format] ?? g.format} · ${STAGE_LABEL[g.stage]}</dd></dl>
+	<h4>Its ads' calls</h4><dl class="kv">${Object.entries(g.counts).filter(([, v]) => v).map(([k, v]) => `<dt>${ACTION_LABEL[k]}</dt><dd>${v}</dd>`).join("")}</dl>
+	<button class="primary" data-act="drill" data-id="${esc(g.id)}" style="width:100%">Open its ${next} ›</button>
+	<p class="muted small">Calls on a group come from its totals against the same lines. Hand calls and tags are made on ads.</p>`);
+	}
 	if (!a) return (el.innerHTML = `<h4>Lines</h4><dl class="kv"><dt>Account CPA</dt><dd>${money(r.lines.account)}</dd><dt>Target</dt><dd>${money(r.lines.target)}</dd><dt>Kill line</dt><dd>${money(r.lines.kill)}</dd><dt>Scale line</dt><dd>${money(r.lines.scale)}</dd><dt>AOV</dt><dd>${money(r.aov)}</dd><dt>Test budget</dt><dd>${money(r.testBudget)}</dd><dt>Basis</dt><dd>${r.basis === "live" ? `last ${S.data.live.days} days` : "lifetime"}</dd><dt>CPA on</dt><dd>${CONVERSION_LABEL[r.primary]}s</dd>${r.secondary ? `<dt>Secondary</dt><dd>${CONVERSION_LABEL[r.secondary]}s</dd>` : ""}</dl>
 		${Object.entries(r.stageLines).filter(([, L]) => L.custom).map(([st, L]) => `<h4>${STAGE_LABEL[st]} lines</h4><dl class="kv"><dt>Graded on</dt><dd>${L.basis === "secondary" ? `cost / ${CONVERSION_LABEL[r.secondary]}` : "CPA"}</dd><dt>Target</dt><dd>${money(L.target)}</dd><dt>Kill line</dt><dd>${money(L.kill)}</dd><dt>Scale line</dt><dd>${money(L.scale)}</dd></dl>`).join("")}
 		<h4>Counts</h4><dl class="kv">${Object.entries(r.counts).map(([k, v]) => `<dt>${ACTION_LABEL[k]}</dt><dd>${v}</dd>`).join("")}</dl>
@@ -462,12 +509,29 @@ function drawer() {
 
 // --- Events ---
 document.addEventListener("click", (e) => {
-	const t = e.target.closest("[data-zoom],[data-multi],[data-multi-clear],[data-filter],[data-step],[data-id],[data-ask],[data-decide],[data-act],[data-sort],[data-view],#toggleLeft,#toggleRight,#settingsBtn,#exportBtn,#refreshBtn");
+	const t = e.target.closest("[data-level],[data-crumb],[data-zoom],[data-multi],[data-multi-clear],[data-filter],[data-step],[data-id],[data-ask],[data-decide],[data-act],[data-sort],[data-view],#toggleLeft,#toggleRight,#settingsBtn,#exportBtn,#refreshBtn");
 	if (!t) {
 		if (!e.target.closest("#exportMenu")) $("#exportMenu").hidden = true;
 		return;
 	}
 	if (t.dataset.zoom) return zoomTo(t.dataset.zoom);
+	if (t.dataset.level) {
+		S.level = t.dataset.level;
+		S.step = null;
+		S.selected = null;
+		return render();
+	}
+	if (t.dataset.crumb) {
+		const to = t.dataset.crumb;
+		if (to === "campaign") Object.assign(S.filters, { campaign: [], adset: [], ad: [] });
+		if (to === "adset") Object.assign(S.filters, { adset: [], ad: [] });
+		if (to === "ad") Object.assign(S.filters, { ad: [] });
+		S.level = to;
+		S.step = null;
+		S.selected = null;
+		return render();
+	}
+	if (t.dataset.act === "drill") return drill(t.dataset.id);
 	if (t.dataset.multi) {
 		const k = t.dataset.multi, set = new Set(S.filters[k]);
 		t.checked ? set.add(t.value) : set.delete(t.value);
@@ -574,6 +638,7 @@ document.addEventListener("click", (e) => {
 		S.filters.campaign = [a.campaignId];
 		S.filters.adset = t.dataset.act === "focus-adset" ? [a.adsetId] : [];
 		S.filters.ad = [];
+		S.level = "ad";
 		S.filters.live = "all";
 		S.step = null;
 		S.view = "map";
@@ -675,10 +740,10 @@ const tip = $("#tip");
 document.addEventListener("mousemove", (e) => {
 	const g = e.target.closest?.(".dot:not(.dim)");
 	if (!g || !S.result) return (tip.hidden = true);
-	const a = S.result.ads.find((x) => x.id === g.dataset.id);
+	const a = S.result.ads.find((x) => x.id === g.dataset.id) ?? S.items.find((x) => x.id === g.dataset.id);
 	if (!a) return (tip.hidden = true);
 	const r = S.result;
-	tip.innerHTML = `<b>${esc(a.name)}</b><div>${esc(a.campaignName)}${a.adsetName ? ` · ${esc(a.adsetName)}` : ""}</div><div class="m">${money(a.spend)} spent · ${fmtInt(a.conv)} ${CONVERSION_LABEL[r.primary]}s · CPA ${a.cpa == null ? "—" : money(a.cpa)}${r.secondary ? ` · ${fmtInt(a.sec)} ${CONVERSION_LABEL[r.secondary]}s` : ""}</div><div class="m">${FORMAT_LABEL[a.format]} · ${STAGE_LABEL[a.stage]} · ${a.live ? `live, ${money(a.spendLive)} in ${S.data.live.days}d` : "not live"}</div><div class="r">${ACTION_LABEL[a.action]}: ${esc(a.reason)}</div>`;
+	tip.innerHTML = `<b>${esc(a.name)}</b><div>${a.kind ? `${a.kind === "campaign" ? "Campaign" : level()[1]} · ${a.liveAds} live / ${a.ads} ads` : `${esc(a.campaignName)}${a.adsetName ? ` · ${esc(a.adsetName)}` : ""}`}</div><div class="m">${money(a.spend)} spent · ${fmtInt(a.conv)} ${CONVERSION_LABEL[r.primary]}s · CPA ${a.cpa == null ? "—" : money(a.cpa)}${r.secondary ? ` · ${fmtInt(a.sec)} ${CONVERSION_LABEL[r.secondary]}s` : ""}</div><div class="m">${FORMAT_LABEL[a.format]} · ${STAGE_LABEL[a.stage]} · ${a.live ? `live, ${money(a.spendLive)} in ${S.data.live.days}d` : "not live"}</div><div class="r">${ACTION_LABEL[a.action]}: ${esc(a.reason)}</div>`;
 	tip.hidden = false;
 	tip.style.left = `${Math.min(e.clientX + 14, window.innerWidth - tip.offsetWidth - 10)}px`;
 	tip.style.top = `${Math.min(e.clientY + 14, window.innerHeight - tip.offsetHeight - 10)}px`;
