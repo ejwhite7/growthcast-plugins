@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 — 2026-10-29
+
+- Web mode: when a connection can't list its ad accounts (for example a Meta system-user token without `ads_read`), the picker shows the platform's refusal and lets staff enter an account id directly.
+
 ## 0.2.0 — 2026-10-27
 - GrowthCast studio: planner-style top bar, filter rail, inspector; Manrope and DM Mono; light and dark.
 - Google Ads accounts (`gads_<customer id>`) next to Meta (`act_<id>`): GAQL pulls through BlueAlpha, ad types as formats, conversion categories as buckets.

@@ -22,7 +22,7 @@
 	"cpa-map": {
 		"repo": null,
 		"inRepo": true,
-		"version": "0.2.0",
+		"version": "0.2.1",
 		"note": "Developed in this repository under plugins/cpa-map; no upstream repo, so sync.mjs skips it."
 	}
 }

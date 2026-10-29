@@ -196,7 +196,8 @@ function webPanel() {
 	${row("meta", "Meta Ads")}${row("google", "Google Ads")}
 	${S.app.canEdit && active.length ? `<h4>Add an ad account</h4>
 	<div class="field"><label>Platform</label><select id="addPlatform"><option value="">Choose…</option>${active.map((p) => `<option value="${p}" ${pk.platform === p ? "selected" : ""}>${PLATFORMS[p].label}</option>`).join("")}</select></div>
-	${pk.platform ? (pk.list === null ? `<p class="muted small">${pk.busy ? "Listing the ad accounts you can reach…" : ""}</p>` : pk.list.length ? `<div class="field"><label>Account</label><select id="addAccount">${pk.list.map((a) => `<option value="${esc(a.externalId)}" data-name="${esc(a.name)}" data-currency="${esc(a.currency ?? "")}">${esc(a.name)} · ${esc(a.externalId)}${a.currency ? ` · ${esc(a.currency)}` : ""}</option>`).join("")}</select></div><button class="primary" data-act="add-account" style="width:100%">Pull it into the map</button><p class="muted small">A first pull takes a few minutes on a big account.</p>` : `<p class="muted small">The connection can't see any ad accounts. Reconnect with a user who has access.</p>`) : ""}` : ""}`;
+	${pk.platform ? `${pk.list === null ? `<p class="muted small">${pk.busy ? "Listing the ad accounts you can reach…" : ""}</p>` : pk.list.length ? `<div class="field"><label>Account</label><select id="addAccount">${pk.list.map((a) => `<option value="${esc(a.externalId)}" data-name="${esc(a.name)}" data-currency="${esc(a.currency ?? "")}">${esc(a.name)} · ${esc(a.externalId)}${a.currency ? ` · ${esc(a.currency)}` : ""}</option>`).join("")}</select></div><button class="primary" data-act="add-account" style="width:100%">Pull it into the map</button><p class="muted small">A first pull takes a few minutes on a big account.</p>` : `<p class="muted small">${pk.error ? `The platform refused to list ad accounts: ${esc(pk.error)}` : "The connection can't see any ad accounts."} ${pk.platform === "meta" ? "A system-user token needs <code>ads_read</code> and the ad account assigned to it; or enter the account id below." : "Enter the customer id below."}</p>`}
+	<div class="field"><label>${pk.list?.length ? "Or an account id" : "Account id"}</label><input id="addAccountId" placeholder="${pk.platform === "meta" ? "act_123456789" : "1234567890"}" autocomplete="off"></div><button class="quiet" data-act="add-account-id" style="width:100%">Pull this id into the map</button>` : ""}` : ""}`;
 }
 function renderRail() {
 	const rail = $("#rail");
@@ -404,13 +405,14 @@ document.addEventListener("click", (e) => {
 		})();
 		return;
 	}
-	if (t.dataset.act === "add-account") {
-		const sel = $("#addAccount"), opt = sel?.selectedOptions[0];
-		if (!opt) return;
+	if (t.dataset.act === "add-account" || t.dataset.act === "add-account-id") {
+		const sel = $("#addAccount"), opt = t.dataset.act === "add-account" ? sel?.selectedOptions[0] : null;
+		const typed = t.dataset.act === "add-account-id" ? ($("#addAccountId")?.value ?? "").trim().replace(/-/g, "") : "";
+		if (!opt && !typed) return toast(S.pickable.platform === "meta" ? "Enter the account id, like act_123456789." : "Enter the 10-digit customer id.");
 		(async () => {
 			try {
 				t.disabled = true;
-				const { account } = await api("api/accounts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: S.project, projectName: currentProject()?.name ?? "", platform: S.pickable.platform, externalId: opt.value, name: opt.dataset.name, currency: opt.dataset.currency }) });
+				const { account } = await api("api/accounts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ projectId: S.project, projectName: currentProject()?.name ?? "", platform: S.pickable.platform, externalId: opt ? opt.value : typed, name: opt ? opt.dataset.name : typed, currency: opt ? opt.dataset.currency : "" }) });
 				S.pickable = { platform: "", list: null, busy: false };
 				await loadAccounts();
 				S.id = account.id;
@@ -466,9 +468,8 @@ document.addEventListener("change", (e) => {
 			S.pickable = { platform: t.value, list, busy: false };
 			renderRail();
 		}).catch((err) => {
-			S.pickable = { platform: t.value, list: [], busy: false };
+			S.pickable = { platform: t.value, list: [], busy: false, error: err.message };
 			renderRail();
-			toast(err.message);
 		});
 	}
 	if (t.id === "account") {
