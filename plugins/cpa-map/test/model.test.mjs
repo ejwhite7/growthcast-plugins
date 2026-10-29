@@ -221,3 +221,12 @@ test("rollup: campaigns and ad sets graded like ads, with their ads' calls count
 	assert.equal(sets[0].id, "adset:as2");
 	assert.equal(sets[0].campaignName, "[US] RT | Visitors");
 });
+
+test("rowsOf: camelCase GAQL rows with only adGroupAd / metrics / segments are rows (conversion categories)", () => {
+	const r = { results: [{ adGroupAd: { ad: { id: "545751871624" } }, metrics: { allConversions: 603, conversions: 603, conversionsValue: 0 }, segments: { conversionActionCategory: "PURCHASE", conversionActionName: "Purchase [GA4, PH]" } }], fieldMask: "x" };
+	assert.equal(rowsOf(r).length, 1);
+	const lifetime = [{ campaign: { id: "1", name: "Brand", advertisingChannelType: "SEARCH", status: "ENABLED" }, adGroup: { id: "10", name: "Exact", status: "ENABLED" }, adGroupAd: { ad: { id: "545751871624", name: "", type: "RESPONSIVE_SEARCH_AD" }, status: "ENABLED" }, metrics: { costMicros: "250000000", impressions: "1000", clicks: "50", conversions: 5, conversionsValue: 500, allConversions: 700 } }];
+	const d = buildGoogle({ account: { id: "gads_1", name: "G", currency: "USD" }, lifetime, conversions: rowsOf(r), today: "2026-10-29" });
+	assert.equal(d.ads[0].conversions.purchase, 603, "secondary purchase actions count through all_conversions");
+	assert.equal(analyse(d, {}).primary, "purchase");
+});

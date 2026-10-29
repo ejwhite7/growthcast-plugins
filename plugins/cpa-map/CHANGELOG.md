@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 — 2026-10-29
+
+- Google Ads: conversion-category rows in camelCase (only `adGroupAd`, `metrics`, `segments`) were not recognised as
+  rows, so purchases, sign-ups, leads and carts stayed at zero on hosted pulls and CPA fell back to the primary
+  conversions. Secondary conversion actions count through `all_conversions`, as intended.
+
 ## 0.4.0 — 2026-10-29
 
 - **Live means delivering.** An ad is live only when it spent in the live window and nothing above it is paused.

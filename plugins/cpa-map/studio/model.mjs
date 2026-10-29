@@ -50,7 +50,8 @@ const zero = () => Object.fromEntries(CONVERSIONS.map((t) => [t, 0]));
 // Find the array of rows inside whatever shape an MCP result arrived in (Meta insights rows or GAQL rows).
 export function rowsOf(raw) {
 	const seen = new Set();
-	const isRow = (x) => x && typeof x === "object" && !Array.isArray(x) && ("ad_id" in x || "spend" in x || "ad_group_ad" in x || "campaign" in x || "customer" in x || "id" in x);
+	// A row: Meta insights (ad_id, spend), a GAQL row in snake_case or the REST camelCase (adGroupAd, metrics, segments), or anything with an id.
+	const isRow = (x) => x && typeof x === "object" && !Array.isArray(x) && ["ad_id", "spend", "ad_group_ad", "adGroupAd", "ad_group", "adGroup", "campaign", "customer", "conversion_action", "conversionAction", "metrics", "segments", "id"].some((k) => k in x);
 	const walk = (v) => {
 		if (!v || typeof v !== "object" || seen.has(v)) return null;
 		seen.add(v);
