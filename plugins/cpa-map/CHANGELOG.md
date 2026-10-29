@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2 — 2026-10-29
+
+- Google Ads: pick which conversion actions count. Settings lists every conversion action on the account with its
+  category and total; tick the ones that should feed purchases, sign-ups, carts, checkouts and leads (for example only
+  the "(PH click ID)" actions), or type a phrase and Tick. Nothing ticked means every action. Each ad now keeps its
+  conversions per action (`ad.actions`), and the readout's inspector shows how many actions are counted.
+
 ## 0.4.1 — 2026-10-29
 
 - Google Ads: conversion-category rows in camelCase (only `adGroupAd`, `metrics`, `segments`) were not recognised as

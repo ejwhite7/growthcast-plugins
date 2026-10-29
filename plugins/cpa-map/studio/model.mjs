@@ -38,6 +38,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
 	// and a fixed target (0 = the account lines). Kill and scale lines multiply the stage's target.
 	stages: { tof: { basis: "", target: 0 }, mof: { basis: "", target: 0 }, bof: { basis: "", target: 0 } },
 	campaignStages: {}, // campaignId -> stage: beats the name tags; a per-ad override still wins
+	googleActions: [], // Google Ads: conversion action names that count (purchase, sign-up, …); [] = every action
 	overrides: {}, // adId -> { format, stage, oneOff }
 	decisions: {}, // adId -> kill | scale | revive | keep (manual calls that beat the rules)
 	notes: "", // free text the exports carry (context for whoever reads the readout)
@@ -216,16 +217,22 @@ export function buildGoogle({ account, lifetime, live = [], last7 = [], conversi
 	};
 	const liveBy = sumBy(live), weekBy = sumBy(last7);
 	const campBy = new Map(campaigns.map((c) => [String(gid(c, "campaign.id") ?? c.id ?? ""), c]));
-	const buckets = new Map();
+	const buckets = new Map(), actionTotals = new Map();
 	for (const r of conversions) {
-		const k = adKey(r), cat = String(gid(r, "segments.conversion_action_category") ?? "").toUpperCase();
+		const k = adKey(r), cat = String(gid(r, "segments.conversion_action_category") ?? "").toUpperCase(), name = String(gid(r, "segments.conversion_action_name") ?? cat);
+		const n = num(gid(r, "metrics.all_conversions") || gid(r, "metrics.conversions")), v = num(gid(r, "metrics.conversions_value"));
+		const t = actionTotals.get(name) ?? { name, category: cat, bucket: GOOGLE_CATEGORY[cat] ?? "", conversions: 0, value: 0 };
+		t.conversions += n; t.value += v; actionTotals.set(name, t);
 		const b = GOOGLE_CATEGORY[cat];
 		if (!k || !b) continue;
-		const cur = buckets.get(k) ?? { conv: zero(), values: zero() };
-		cur.conv[b] += num(gid(r, "metrics.all_conversions") || gid(r, "metrics.conversions"));
-		cur.values[b] += num(gid(r, "metrics.conversions_value"));
+		const cur = buckets.get(k) ?? { conv: zero(), values: zero(), actions: {} };
+		cur.conv[b] += n;
+		cur.values[b] += v;
+		const act = cur.actions[name] ?? { category: cat, conv: 0, value: 0 };
+		act.conv += n; act.value += v; cur.actions[name] = act;
 		buckets.set(k, cur);
 	}
+	const conversionActions = [...actionTotals.values()].sort((a, b) => b.conversions - a.conversions);
 	const seen = new Map();
 	for (const r of lifetime) {
 		const id = adKey(r);
@@ -245,13 +252,13 @@ export function buildGoogle({ account, lifetime, live = [], last7 = [], conversi
 		const channel = gid(r, "campaign.advertising_channel_type") ?? gid(c, "campaign.advertising_channel_type") ?? "";
 		const adsetName = gid(r, "ad_group.name") ?? "", campaignName = gid(r, "campaign.name") ?? "";
 		const name = gid(r, "ad_group_ad.ad.name") || `${GOOGLE_TYPE_LABEL(type) || "Ad"} ${id.slice(-6)} · ${adsetName}`;
-		const b = buckets.get(id) ?? { conv: zero(), values: zero() };
+		const b = buckets.get(id) ?? { conv: zero(), values: zero(), actions: {} };
 		const l = liveBy.get(id), w = weekBy.get(id);
 		seen.set(id, {
 			id, name, campaignId, campaignName, adsetId: String(gid(r, "ad_group.id") ?? ""), adsetName,
 			campaignStatus: gid(r, "campaign.status") ?? gid(c, "campaign.status") ?? "", adsetStatus: gid(r, "ad_group.status") ?? "", objective: String(channel), channel: String(channel), status: gid(r, "ad_group_ad.status") ?? "",
 			spend: cost, impressions: num(gid(r, "metrics.impressions")), clicks: num(gid(r, "metrics.clicks")),
-			conversions: { ...b.conv, conversion: num(gid(r, "metrics.conversions")) }, values: { ...b.values, conversion: num(gid(r, "metrics.conversions_value")) },
+			conversions: { ...b.conv, conversion: num(gid(r, "metrics.conversions")) }, values: { ...b.values, conversion: num(gid(r, "metrics.conversions_value")) }, actions: b.actions,
 			spendLive: l?.cost ?? 0, conversionsLive: { ...zero(), conversion: l?.conv ?? 0 }, spend7: w?.cost ?? 0,
 			format: tagGoogleFormat(type, channel), stage: tagStage(name, adsetName, campaignName), oneOff: isOneOff(name, adsetName, campaignName),
 		});
@@ -259,7 +266,7 @@ export function buildGoogle({ account, lifetime, live = [], last7 = [], conversi
 	const ads = [...seen.values()].sort((a, b) => b.spend - a.spend);
 	const d = new Date(today);
 	const liveSince = new Date(d.getTime() - liveDays * 864e5).toISOString().slice(0, 10);
-	return { schema: SCHEMA, platform: "google", account, builtAt, window: { since: null, until: today }, live: { days: liveDays, since: liveSince, until: today }, ads };
+	return { schema: SCHEMA, platform: "google", account, builtAt, window: { since: null, until: today }, live: { days: liveDays, since: liveSince, until: today }, conversionActions, ads };
 }
 
 export const normalizeSettings = (s) => {
@@ -279,6 +286,7 @@ export const normalizeSettings = (s) => {
 		const v = st[k] && typeof st[k] === "object" ? st[k] : {};
 		return [k, { basis: v.basis === "secondary" ? "secondary" : v.basis === "primary" ? "primary" : "", target: Math.max(0, num(v.target)) }];
 	}));
+	out.googleActions = Array.isArray(out.googleActions) ? out.googleActions.map(String).filter(Boolean) : [];
 	out.campaignStages = Object.fromEntries(Object.entries(out.campaignStages && typeof out.campaignStages === "object" ? out.campaignStages : {}).filter(([, v]) => STAGES.includes(v)));
 	out.overrides = out.overrides && typeof out.overrides === "object" ? out.overrides : {};
 	out.decisions = out.decisions && typeof out.decisions === "object" ? out.decisions : {};
@@ -321,7 +329,18 @@ export function analyse(data, rawSettings) {
 	const s = normalizeSettings(rawSettings);
 	const platform = data.platform ?? "meta";
 	const P = s.primary || pickPrimary(data.ads, platform), S = s.secondary || pickSecondary(data.ads, P);
-	const all = data.ads.map((a) => ({ ...a, ...(s.campaignStages[a.campaignId] ? { stage: s.campaignStages[a.campaignId] } : {}), ...(s.overrides[a.id] ?? {}) }));
+	// Google: the buckets (purchase, sign-up, …) come from the conversion actions the settings allow; [] = every action.
+	const rebucket = (a) => {
+		if (platform !== "google" || !a.actions || !s.googleActions.length) return a;
+		const conv = zero(), values = zero();
+		for (const [name, x] of Object.entries(a.actions)) {
+			const b = GOOGLE_CATEGORY[String(x.category).toUpperCase()];
+			if (!b || !s.googleActions.includes(name)) continue;
+			conv[b] += x.conv; values[b] += x.value;
+		}
+		return { ...a, conversions: { ...conv, conversion: a.conversions.conversion }, values: { ...values, conversion: a.values.conversion } };
+	};
+	const all = data.ads.map((a) => ({ ...rebucket(a), ...(s.campaignStages[a.campaignId] ? { stage: s.campaignStages[a.campaignId] } : {}), ...(s.overrides[a.id] ?? {}) }));
 	const onMap = all.filter((a) => a.spend >= s.minSpend);
 	const sum = (list, f) => list.reduce((t, a) => t + f(a), 0);
 	const liveAds = all.filter((a) => a.spendLive > 0);
@@ -379,7 +398,7 @@ export function analyse(data, rawSettings) {
 		g.spend += a.spend; g.ads++;
 	}
 	adsets.sort((a, b) => b.spend - a.spend);
-	return { platform, currency: cur, settings: s, primary: P, secondary: S, lines, linesSecondary, stageLines, aov, testBudget, basis: basisLive ? "live" : "lifetime", ads, counts, hidden: all.length - onMap.length, campaigns, adsets, formats: PLATFORMS[platform].formats };
+	return { platform, currency: cur, settings: s, primary: P, secondary: S, lines, linesSecondary, stageLines, aov, actionsCounted: platform === "google" ? (s.googleActions.length ? s.googleActions : (data.conversionActions ?? []).map((x) => x.name)) : null, testBudget, basis: basisLive ? "live" : "lifetime", ads, counts, hidden: all.length - onMap.length, campaigns, adsets, formats: PLATFORMS[platform].formats };
 }
 
 // Drill-down: one record per campaign (level "campaign") or ad set (level "adset"), shaped like an ad so the chart,

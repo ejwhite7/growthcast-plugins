@@ -230,3 +230,20 @@ test("rowsOf: camelCase GAQL rows with only adGroupAd / metrics / segments are r
 	assert.equal(d.ads[0].conversions.purchase, 603, "secondary purchase actions count through all_conversions");
 	assert.equal(analyse(d, {}).primary, "purchase");
 });
+
+test("Google conversion actions: each ad keeps its per-action counts; settings.googleActions picks which count", () => {
+	const row = (id, cat, name, n) => ({ adGroupAd: { ad: { id } }, metrics: { allConversions: n, conversions: n, conversionsValue: 0 }, segments: { conversionActionCategory: cat, conversionActionName: name } });
+	const conversions = [row("1", "PURCHASE", "Purchase [GA4, PH]", 100), row("1", "PURCHASE", "Purchase (PH click ID)", 7), row("1", "SIGNUP", "Sign-up (PH click ID)", 9), row("1", "SIGNUP", "DurableGA4 (web) sign_up", 500)];
+	const lifetime = [{ campaign: { id: "1", name: "NB", advertisingChannelType: "SEARCH", status: "ENABLED" }, adGroup: { id: "10", name: "G", status: "ENABLED" }, adGroupAd: { ad: { id: "1", type: "RESPONSIVE_SEARCH_AD" }, status: "ENABLED" }, metrics: { costMicros: "700000000", impressions: "1", clicks: "1", conversions: 1, conversionsValue: 0, allConversions: 616 } }];
+	const d = buildGoogle({ account: { id: "gads_1", name: "G", currency: "USD" }, lifetime, conversions, today: "2026-10-29" });
+	assert.equal(d.conversionActions.length, 4);
+	assert.equal(d.conversionActions[0].name, "DurableGA4 (web) sign_up");
+	assert.equal(d.ads[0].conversions.purchase, 107);
+	const all = analyse(d, {});
+	assert.equal(all.ads[0].conv, 107);
+	const ph = analyse(d, { googleActions: ["Purchase (PH click ID)", "Sign-up (PH click ID)"] });
+	assert.equal(ph.ads[0].conversions.purchase, 7);
+	assert.equal(ph.ads[0].conversions.complete_registration, 9);
+	assert.equal(ph.ads[0].cpa, 100);
+	assert.deepEqual(ph.actionsCounted, ["Purchase (PH click ID)", "Sign-up (PH click ID)"]);
+});

@@ -431,7 +431,7 @@ function renderInspector() {
 	<button class="primary" data-act="drill" data-id="${esc(g.id)}" style="width:100%">Open its ${next} ›</button>
 	<p class="muted small">Calls on a group come from its totals against the same lines. Hand calls and tags are made on ads.</p>`);
 	}
-	if (!a) return (el.innerHTML = `<h4>Lines</h4><dl class="kv"><dt>Account CPA</dt><dd>${money(r.lines.account)}</dd><dt>Target</dt><dd>${money(r.lines.target)}</dd><dt>Kill line</dt><dd>${money(r.lines.kill)}</dd><dt>Scale line</dt><dd>${money(r.lines.scale)}</dd><dt>AOV</dt><dd>${money(r.aov)}</dd><dt>Test budget</dt><dd>${money(r.testBudget)}</dd><dt>Basis</dt><dd>${r.basis === "live" ? `last ${S.data.live.days} days` : "lifetime"}</dd><dt>CPA on</dt><dd>${CONVERSION_LABEL[r.primary]}s</dd>${r.secondary ? `<dt>Secondary</dt><dd>${CONVERSION_LABEL[r.secondary]}s</dd>` : ""}</dl>
+	if (!a) return (el.innerHTML = `<h4>Lines</h4><dl class="kv"><dt>Account CPA</dt><dd>${money(r.lines.account)}</dd><dt>Target</dt><dd>${money(r.lines.target)}</dd><dt>Kill line</dt><dd>${money(r.lines.kill)}</dd><dt>Scale line</dt><dd>${money(r.lines.scale)}</dd><dt>AOV</dt><dd>${money(r.aov)}</dd><dt>Test budget</dt><dd>${money(r.testBudget)}</dd><dt>Basis</dt><dd>${r.basis === "live" ? `last ${S.data.live.days} days` : "lifetime"}</dd><dt>CPA on</dt><dd>${CONVERSION_LABEL[r.primary]}s</dd>${r.secondary ? `<dt>Secondary</dt><dd>${CONVERSION_LABEL[r.secondary]}s</dd>` : ""}${r.actionsCounted ? `<dt>Actions counted</dt><dd>${r.settings.googleActions.length ? `${r.settings.googleActions.length} of ${S.data.conversionActions?.length ?? "?"}` : "all"}</dd>` : ""}</dl>
 		${Object.entries(r.stageLines).filter(([, L]) => L.custom).map(([st, L]) => `<h4>${STAGE_LABEL[st]} lines</h4><dl class="kv"><dt>Graded on</dt><dd>${L.basis === "secondary" ? `cost / ${CONVERSION_LABEL[r.secondary]}` : "CPA"}</dd><dt>Target</dt><dd>${money(L.target)}</dd><dt>Kill line</dt><dd>${money(L.kill)}</dd><dt>Scale line</dt><dd>${money(L.scale)}</dd></dl>`).join("")}
 		<h4>Counts</h4><dl class="kv">${Object.entries(r.counts).map(([k, v]) => `<dt>${ACTION_LABEL[k]}</dt><dd>${v}</dd>`).join("")}</dl>
 		<p class="muted small">Click a dot or a row to see its numbers, fix its format or stage, or call it by hand. Filled dots are live; hollow ones haven't spent in ${S.data.live.days} days.</p>`);
@@ -500,6 +500,9 @@ function drawer() {
 	${row("Secondary (TOF metric)", `Auto picks ${CONVERSION_LABEL[r.secondary] ?? "nothing"}`, selectf("secondary", [["", "Auto"], ...CONVERSIONS.map((c) => [c, CONVERSION_LABEL[c]])]))}
 	${row("Grade TOF on the secondary", "Step 8: TOF ads judged on cost per secondary conversion", selectf("gradeTofBySecondary", [["false", "No"], ["true", "Yes"]]))}
 	${row("Live window (days)", "Changing this needs a rebuild: use Refresh", `<input type="number" value="${s.liveDays}" disabled>`)}
+	${S.data.platform === "google" && S.data.conversionActions?.length ? `<h4>Google conversion actions</h4><p class="help">Only ticked actions count towards purchases, sign-ups, carts, checkouts and leads. Nothing ticked = every action. Google's own primary "conversions" column is unaffected.</p>
+	<div class="gactions">${S.data.conversionActions.map((x) => `<label class="check"><input type="checkbox" data-gaction="${esc(x.name)}" ${s.googleActions.includes(x.name) ? "checked" : ""}> <span class="name" title="${esc(x.name)}">${esc(x.name)}</span><small>${esc(x.bucket ? CONVERSION_LABEL[x.bucket] : x.category.toLowerCase())} · ${fmtInt(x.conversions)}</small></label>`).join("")}</div>
+	<div class="row"><div>Quick pick<small>Tick every action whose name contains a phrase</small></div><div style="display:flex;gap:6px"><input type="text" id="gactionQ" placeholder="(PH click ID)"><button class="quiet" data-act="gaction-pick">Tick</button>${s.googleActions.length ? `<button class="quiet" data-act="gaction-clear">All</button>` : ""}</div></div>` : ""}
 	<h4>Goals by stage</h4><p class="help">Each stage can be graded on its own conversion and its own target; kill and scale lines multiply that target. 0 keeps the account lines.</p>
 	${["tof", "mof", "bof"].map((st) => { const cfg = s.stages[st], L = r.stageLines[st]; return row(`${STAGE_LABEL[st]}: graded on`, `Target ${money(L.target)} · kill ${money(L.kill)} · scale ${money(L.scale)}${L.basis === "secondary" ? ` per ${CONVERSION_LABEL[r.secondary]}` : ""}`, `<select data-stage-set="${st}.basis"><option value="" ${!cfg.basis ? "selected" : ""}>Auto (${st === "tof" && s.gradeTofBySecondary && r.secondary ? CONVERSION_LABEL[r.secondary] : "CPA"})</option><option value="primary" ${cfg.basis === "primary" ? "selected" : ""}>CPA on ${CONVERSION_LABEL[r.primary]}s</option>${r.secondary ? `<option value="secondary" ${cfg.basis === "secondary" ? "selected" : ""}>Cost per ${CONVERSION_LABEL[r.secondary]}</option>` : ""}</select>`) + row(`${STAGE_LABEL[st]}: target`, "0 = from the account lines", `<input type="number" step="1" min="0" data-stage-set="${st}.target" value="${cfg.target}">`); }).join("")}
 	<h4>Campaign stages</h4><p class="help">Stages come from names: TOF for prospecting, cold, lookalike, broad, non-brand; MOF for retargeting, engaged, conquest; BOF for cart, checkout, brand, past buyers. Set a campaign here when the names mislead; one ad's stage can still be changed in the inspector.</p>
@@ -573,6 +576,13 @@ document.addEventListener("click", (e) => {
 		document.body.classList.toggle(left ? "hide-left" : "hide-right");
 		t.setAttribute("aria-pressed", String(!document.body.classList.contains(left ? "hide-left" : "hide-right")));
 		return;
+	}
+	if (t.dataset.act === "gaction-pick" || t.dataset.act === "gaction-clear") {
+		const q = ($("#gactionQ")?.value ?? "").trim().toLowerCase();
+		const names = t.dataset.act === "gaction-clear" ? [] : (S.data.conversionActions ?? []).filter((x) => q && x.name.toLowerCase().includes(q)).map((x) => x.name);
+		if (t.dataset.act === "gaction-pick" && !names.length) return toast("No conversion action name contains that.");
+		saveSettings({ googleActions: names });
+		return drawer();
 	}
 	if (t.id === "settingsBtn" || t.dataset.act === "settings") {
 		S.drawer = !S.drawer;
@@ -687,6 +697,12 @@ document.addEventListener("change", (e) => {
 		return render();
 	}
 	if (t.dataset.tag && S.selected) return setOverride(S.selected, { [t.dataset.tag]: t.type === "checkbox" ? t.checked : t.value });
+	if (t.dataset.gaction != null) {
+		const cur = new Set(S.result.settings.googleActions);
+		t.checked ? cur.add(t.dataset.gaction) : cur.delete(t.dataset.gaction);
+		saveSettings({ googleActions: [...cur] });
+		return drawer();
+	}
 	if (t.dataset.stageSet) {
 		const [st, key] = t.dataset.stageSet.split(".");
 		const cur = S.result.settings.stages;
