@@ -32,6 +32,12 @@ export const DEFAULT_SETTINGS = Object.freeze({
 	aov: 0, // average order value; 0 = conversion value ÷ conversions across the account
 	minRevivePurchases: 3,
 	gradeTofBySecondary: false, // step 8: judge TOF ads on cost per secondary conversion
+	targetMode: "pct", // "pct": target = account CPA × (1 − targetPct); "cpa": target = targetCpa
+	targetCpa: 0, // a fixed target CPA on the primary conversion, used when targetMode is "cpa"
+	// Per stage: the conversion it is graded on ("" = CPA, or the secondary for TOF under step 8; "primary" | "secondary")
+	// and a fixed target (0 = the account lines). Kill and scale lines multiply the stage's target.
+	stages: { tof: { basis: "", target: 0 }, mof: { basis: "", target: 0 }, bof: { basis: "", target: 0 } },
+	campaignStages: {}, // campaignId -> stage: beats the name tags; a per-ad override still wins
 	overrides: {}, // adId -> { format, stage, oneOff }
 	decisions: {}, // adId -> kill | scale | revive | keep (manual calls that beat the rules)
 	notes: "", // free text the exports carry (context for whoever reads the readout)
@@ -257,6 +263,14 @@ export const normalizeSettings = (s) => {
 	if (out.primary && !CONVERSIONS.includes(out.primary)) out.primary = "";
 	if (out.secondary && !CONVERSIONS.includes(out.secondary)) out.secondary = "";
 	out.cpaBasis = out.cpaBasis === "lifetime" ? "lifetime" : "live";
+	out.targetMode = out.targetMode === "cpa" ? "cpa" : "pct";
+	out.targetCpa = Math.max(0, num(out.targetCpa));
+	const st = out.stages && typeof out.stages === "object" ? out.stages : {};
+	out.stages = Object.fromEntries(["tof", "mof", "bof"].map((k) => {
+		const v = st[k] && typeof st[k] === "object" ? st[k] : {};
+		return [k, { basis: v.basis === "secondary" ? "secondary" : v.basis === "primary" ? "primary" : "", target: Math.max(0, num(v.target)) }];
+	}));
+	out.campaignStages = Object.fromEntries(Object.entries(out.campaignStages && typeof out.campaignStages === "object" ? out.campaignStages : {}).filter(([, v]) => STAGES.includes(v)));
 	out.overrides = out.overrides && typeof out.overrides === "object" ? out.overrides : {};
 	out.decisions = out.decisions && typeof out.decisions === "object" ? out.decisions : {};
 	out.notes = String(out.notes ?? "").slice(0, 4000);
@@ -280,7 +294,7 @@ export function analyse(data, rawSettings) {
 	const s = normalizeSettings(rawSettings);
 	const platform = data.platform ?? "meta";
 	const P = s.primary || pickPrimary(data.ads, platform), S = s.secondary || pickSecondary(data.ads, P);
-	const all = data.ads.map((a) => ({ ...a, ...(s.overrides[a.id] ?? {}) }));
+	const all = data.ads.map((a) => ({ ...a, ...(s.campaignStages[a.campaignId] ? { stage: s.campaignStages[a.campaignId] } : {}), ...(s.overrides[a.id] ?? {}) }));
 	const onMap = all.filter((a) => a.spend >= s.minSpend);
 	const sum = (list, f) => list.reduce((t, a) => t + f(a), 0);
 	const liveAds = all.filter((a) => a.spendLive > 0);
@@ -292,8 +306,15 @@ export function analyse(data, rawSettings) {
 	const accountCpa = sum(basis, (a) => convOf(a, P)) ? sum(basis, spendOf) / sum(basis, (a) => convOf(a, P)) : 0;
 	const secBasis = S && sum(all, (a) => a.conversions[S]) ? all : [];
 	const accountCps = secBasis.length ? sum(secBasis, (a) => a.spend) / sum(secBasis, (a) => a.conversions[S]) : 0;
-	const linesFor = (base) => ({ account: base, target: base * (1 - s.targetPct), kill: base * (1 - s.targetPct) * s.killMult, scale: base * (1 - s.targetPct) * s.scaleMult, cap: base * (1 - s.targetPct) * s.capMult });
-	const lines = linesFor(accountCpa), linesSecondary = linesFor(accountCps);
+	const linesFor = (base, target = base * (1 - s.targetPct)) => ({ account: base, target, kill: target * s.killMult, scale: target * s.scaleMult, cap: target * s.capMult });
+	const lines = linesFor(accountCpa, s.targetMode === "cpa" && s.targetCpa > 0 ? s.targetCpa : undefined), linesSecondary = linesFor(accountCps);
+	// Per-stage lines: the conversion each stage is graded on and, when set, its own target.
+	const stageLines = Object.fromEntries(STAGES.map((st) => {
+		const cfg = s.stages[st] ?? { basis: "", target: 0 };
+		const basis = S && (cfg.basis === "secondary" || (!cfg.basis && st === "tof" && s.gradeTofBySecondary)) ? "secondary" : "primary";
+		const base = basis === "secondary" ? linesSecondary : lines;
+		return [st, { basis, custom: cfg.target > 0 || (cfg.basis === "secondary" && !!S), ...(cfg.target > 0 ? linesFor(base.account, cfg.target) : base) }];
+	}));
 	const pConv = sum(all, (a) => a.conversions[P]), pValue = sum(all, (a) => a.values[P]);
 	const aov = s.aov || (pConv ? pValue / pConv : 0);
 	const testBudget = s.testBudget || 3 * lines.target;
@@ -303,8 +324,9 @@ export function analyse(data, rawSettings) {
 		const conv = a.conversions[P], cpa = conv ? a.spend / conv : null;
 		const sec = S ? a.conversions[S] : 0, cps = sec ? a.spend / sec : null;
 		const live = a.spendLive > 0;
-		const gradeBySecondary = s.gradeTofBySecondary && a.stage === "tof" && S;
-		const metric = gradeBySecondary ? cps : cpa, L = gradeBySecondary ? linesSecondary : lines, n = gradeBySecondary ? sec : conv;
+		const sl = stageLines[a.stage] ?? { basis: "primary", ...lines };
+		const gradeBySecondary = sl.basis === "secondary";
+		const metric = gradeBySecondary ? cps : cpa, L = sl, n = gradeBySecondary ? sec : conv;
 		const unit = CONVERSION_LABEL[gradeBySecondary ? S : P];
 		let action, reason;
 		const manual = s.decisions[a.id];
@@ -327,6 +349,13 @@ export function analyse(data, rawSettings) {
 		const c = campaigns.find((x) => x.id === a.campaignId);
 		c.spend += a.spend; c.ads++; if (a.live) c.live++;
 	}
+	for (const c of campaigns) {
+		// The stage the names gave the campaign's ads (most common), and the stage in force after campaignStages.
+		const tally = {};
+		for (const a of data.ads) if (a.campaignId === c.id) tally[a.stage] = (tally[a.stage] ?? 0) + 1;
+		c.autoStage = Object.entries(tally).sort((x, y) => y[1] - x[1])[0]?.[0] ?? "unknown";
+		c.stage = s.campaignStages[c.id] ?? c.autoStage;
+	}
 	campaigns.sort((a, b) => b.live - a.live || b.spend - a.spend);
 	const adsets = [...new Map(ads.map((a) => [a.adsetId, { id: a.adsetId, name: a.adsetName, campaignId: a.campaignId, spend: 0, ads: 0 }])).values()];
 	for (const a of ads) {
@@ -334,7 +363,7 @@ export function analyse(data, rawSettings) {
 		g.spend += a.spend; g.ads++;
 	}
 	adsets.sort((a, b) => b.spend - a.spend);
-	return { platform, settings: s, primary: P, secondary: S, lines, linesSecondary, aov, testBudget, basis: basisLive ? "live" : "lifetime", ads, counts, hidden: all.length - onMap.length, campaigns, adsets, formats: PLATFORMS[platform].formats };
+	return { platform, settings: s, primary: P, secondary: S, lines, linesSecondary, stageLines, aov, testBudget, basis: basisLive ? "live" : "lifetime", ads, counts, hidden: all.length - onMap.length, campaigns, adsets, formats: PLATFORMS[platform].formats };
 }
 
 // Like-with-like: per format and per stage, the best and worst live ads and the spread between them.

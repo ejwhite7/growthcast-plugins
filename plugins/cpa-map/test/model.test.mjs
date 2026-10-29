@@ -150,3 +150,22 @@ test("buildGoogle: camelCase REST rows (Composio) read the same as snake_case ro
 	assert.equal(b.format, a.format);
 	assert.equal(b.status, "ENABLED");
 });
+
+test("stage goals: fixed target CPA, campaign stage assignment, per-stage basis and target", () => {
+	const data = metaFixture();
+	const fixed = analyse(data, { targetMode: "cpa", targetCpa: 100 });
+	assert.equal(fixed.lines.target, 100);
+	assert.equal(fixed.lines.kill, 150);
+	const r = analyse(data, { campaignStages: { c2: "tof" }, overrides: { revive: { stage: "bof" } } });
+	assert.equal(r.campaigns.find((c) => c.id === "c2").stage, "tof", "campaign assignment beats the name tag");
+	assert.equal(r.ads.find((a) => a.id === "revive").stage, "bof", "a per-ad override still wins");
+	const r2 = analyse(data, { campaignStages: { c1: "bof" }, stages: { bof: { basis: "primary", target: 60 } } });
+	assert.equal(r2.stageLines.bof.target, 60);
+	assert.equal(r2.stageLines.bof.kill, 90);
+	assert.equal(r2.stageLines.bof.custom, true);
+	assert.equal(r2.stageLines.tof.custom, false);
+	const hold = r2.ads.find((a) => a.id === "hold");
+	assert.equal(hold.stage, "bof");
+	assert.equal(hold.action, "kill", "CPA 182 is above the stage's own kill line of 90");
+	assert.equal(analyse(data, {}).ads.find((a) => a.id === "hold").action, "hold");
+});

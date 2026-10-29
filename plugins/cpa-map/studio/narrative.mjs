@@ -69,6 +69,7 @@ export function narrative(result, data) {
 				convAll && convLive ? `The account is running ${spendLive / convLive > spendAll / convAll ? "worse" : "better"} than its own history: current CPA ${m(spendLive / convLive)} against a lifetime ${m(spendAll / convAll)}.` : "",
 			].filter(Boolean) },
 			{ title: "The lines", paragraphs: [
+				...Object.entries(result.stageLines ?? {}).filter(([, SL]) => SL.custom).map(([st, SL]) => `${STAGE_LABEL[st]} is graded on ${SL.basis === "secondary" ? `cost per ${S}` : "CPA"}: target ${m(SL.target)}, kill line ${m(SL.kill)}, scale line ${m(SL.scale)}.`),
 				`Account CPA ${m(L.account)} (${result.basis === "live" ? `blended over the last ${data.live.days} days` : "lifetime"}). Target ${m(L.target)}, ${Math.round(result.settings.targetPct * 100)}% under. Kill line ${m(L.kill)} (${result.settings.killMult}× target). Scale line ${m(L.scale)} (${result.settings.scaleMult}× target). AOV ${m(result.aov)}; test budget ${m(result.testBudget)}.${S ? ` Secondary metric: ${S}s, account cost ${m(result.linesSecondary.account)} each.` : ""}`,
 				`Of the ${live.length} live ads: ${bands.aboveKill.length} sit above the kill line, ${bands.between.length} between the lines, ${bands.underScale.length} under the scale line, and ${bands.none.length} have no ${P} yet. The five biggest live ads carry ${fmtPct(share(sum(top5, (a) => a.spendLive), spendLive))} of recent spend${top5[0] ? `; the largest, ${top5[0].name}, has a CPA of ${top5[0].cpa == null ? "—" : m(top5[0].cpa)}` : ""}.`,
 			] },

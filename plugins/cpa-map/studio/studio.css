@@ -59,6 +59,29 @@ aside { background: var(--panel); overflow-y: auto; }
 .field label { display: block; font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 3px; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 8px 0; }
 .check input { width: auto; }
+.multi { border: 1px solid var(--line-2); background: var(--card); margin-bottom: 8px; }
+.multi summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 8px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.multi summary::-webkit-details-marker { display: none; }
+.multi summary::before { content: "▸"; font-size: 10px; margin-right: 4px; }
+.multi[open] summary::before { content: "▾"; }
+.multi summary span { flex: 1; }
+.multi summary b { font-weight: 500; color: var(--fg); }
+.multi[open] summary { border-bottom: 1px solid var(--line-2); }
+.multi-list { padding: 6px 8px; max-height: 240px; overflow: auto; }
+.multi-list input[type="search"] { width: 100%; margin-bottom: 6px; font-size: 12px; }
+.multi-items label { display: flex; gap: 6px; align-items: baseline; font-size: 12px; line-height: 1.3; padding: 2px 0; cursor: pointer; }
+.multi-items label input { width: auto; margin: 0; flex: none; position: relative; top: 1px; }
+.multi-items label span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multi-items label small { color: var(--muted); font-family: var(--mono); font-size: 10.5px; white-space: nowrap; }
+.multi-list > button { margin-top: 6px; width: 100%; }
+.camp-stages { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; margin-bottom: 12px; }
+.camp-stages th:nth-child(2), .camp-stages td:nth-child(2) { width: 34px; }
+.camp-stages th:nth-child(3), .camp-stages td:nth-child(3) { width: 66px; }
+.camp-stages th:nth-child(4), .camp-stages td:nth-child(4) { width: 100px; padding-right: 0; }
+.camp-stages th { font-family: var(--mono); font-size: 10.5px; color: var(--muted); font-weight: 500; }
+.camp-stages th, .camp-stages td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line-2); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.camp-stages .num { text-align: right; font-family: var(--mono); }
+.camp-stages select { width: 100%; font-size: 12px; padding: 2px 4px; }
 .steps { display: grid; gap: 4px; }
 .steps button { text-align: left; font-family: var(--sans); font-size: 12.5px; letter-spacing: 0; border-color: var(--line-2); padding: 7px 10px; white-space: normal; line-height: 1.3; }
 .steps button b { font-family: var(--mono); font-size: 10.5px; color: var(--accent-text); display: block; letter-spacing: .06em; }

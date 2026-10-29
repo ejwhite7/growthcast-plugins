@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — 2026-10-29
+
+- Campaign, ad set (ad group) and ad filters are multi-select, with a type-to-find box in each; deep links take
+  comma-separated ids. Ads are a new filter.
+- Goals by stage: each of TOF / MOF / BOF can be graded on CPA or the secondary conversion and given its own target;
+  kill and scale lines multiply it. The chart draws the stage's lines when one stage is filtered; the readout names them.
+- Campaign stages: a table in Settings shows each campaign's tagged stage and lets you set it; per-ad overrides still win.
+- The target can be a fixed CPA instead of a % under the account CPA.
+- `?settings` opens the Settings drawer from a link.
+
 ## 0.2.3 — 2026-10-29
 
 - Web mode: DELETE calls (disconnect a platform, dismiss a request) carry the JSON content type the portal proxy requires.

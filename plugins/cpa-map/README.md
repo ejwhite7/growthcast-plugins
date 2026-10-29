@@ -4,8 +4,10 @@ A Claude Code plugin that puts every Meta or Google ad on one map and works the 
 
 - **X** = log of lifetime spend, **Y** = CPA (or cost per add-to-cart / sign-up / lead). Paused ads included: hollow dots.
 - **Four lines:** current blended account CPA, target (15% under), kill line (1.5× target), scale line (0.7× target).
-- **Filters:** live / not live, format, funnel stage, campaign, ad set (ad group), Y metric, a find box, and a switch to
-  hide everything outside the filters instead of fading it.
+- **Filters:** live / not live, format, funnel stage, multi-select campaigns, ad sets (ad groups) and ads, Y metric, a
+  find box, and a switch to hide everything outside the filters instead of fading it.
+- **Goals:** the target as a % under the account CPA or a fixed CPA; per stage, the conversion it is graded on and its
+  own target (kill and scale lines follow); campaign-level stage assignment over the name tags, per-ad overrides on top.
 - **Steps:** turn paused winners back on · kill and scale what's live · compare like with like by format · grade each stage on its own metric.
 - Every ad gets a call (kill, scale, revive, testing, hold) with the number behind it; the inspector fixes tags or overrules the rule.
 - **Actions** and **Readout** views, generated from the numbers. **Export:** HTML report, GrowthCast slide deck, slides PDF,

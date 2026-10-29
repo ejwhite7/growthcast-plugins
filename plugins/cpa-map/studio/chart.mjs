@@ -9,12 +9,12 @@ const niceStep = (raw) => {
 };
 const shortMoney = (v, cur) => fmtMoney(v, cur, 0).replace(/,000,000$/, "M").replace(/,000$/, "K");
 
-// options: { y: "cpa" | "cps", shown: (ad) => boolean, hideOthers, selected, width, height, compact (fewer labels),
+// options: { y: "cpa" | "cps", shown: (ad) => boolean, hideOthers, selected, width, height, compact (fewer labels), lines (override),
 //            liveDays, title (aria) }
 export function renderChart(result, currency, options = {}) {
 	const { y = "cpa", shown = () => true, hideOthers = false, selected = null, width: W = 900, height: H = 520, compact = false } = options;
 	const s = result.settings;
-	const L = y === "cps" ? result.linesSecondary : result.lines;
+	const L = options.lines ?? (y === "cps" ? result.linesSecondary : result.lines);
 	const yOf = (a) => (y === "cps" ? a.cps : a.cpa);
 	const yName = y === "cps" ? `cost per ${CONVERSION_LABEL[result.secondary]}` : "CPA";
 	const m = { t: 44, r: compact ? 150 : 215, b: 44, l: 64 };

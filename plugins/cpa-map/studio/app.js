@@ -7,8 +7,9 @@ import { ACTION_LABEL, ACTION_ORDER, CONVERSIONS, CONVERSION_LABEL, FORMAT_LABEL
 import { planSections, readoutSections } from "./report.mjs";
 
 const $ = (s, el = document) => el.querySelector(s);
-const FILTERS = () => ({ live: "live", format: "all", stage: "all", campaign: "all", adset: "all", y: "cpa", hide: false, q: "" });
-const S = { app: { mode: "local", canEdit: true, asks: [], pdf: false, platforms: { meta: true, google: true } }, projects: [], project: "", connections: [], pickable: { platform: "", list: null, busy: false }, accounts: [], id: null, data: null, settings: null, version: null, result: null, view: "map", filters: FILTERS(), step: 6, selected: null, sort: { key: "action", dir: 1 }, request: null, drawer: false };
+const FILTERS = () => ({ live: "live", format: "all", stage: "all", campaign: [], adset: [], ad: [], y: "cpa", hide: false, q: "" });
+const LISTS = ["campaign", "adset", "ad"]; // multi-select filters: [] = all
+const S = { app: { mode: "local", canEdit: true, asks: [], pdf: false, platforms: { meta: true, google: true } }, projects: [], project: "", connections: [], pickable: { platform: "", list: null, busy: false }, accounts: [], id: null, data: null, settings: null, version: null, result: null, view: "map", filters: FILTERS(), step: 6, selected: null, sort: { key: "action", dir: 1 }, request: null, drawer: false, openMulti: {}, multiQ: {} };
 const STEPS = {
 	0: { title: "Every ad on one map.", sub: "Log lifetime spend across, CPA up. Left half is testing; top right is high spend / high cost; bottom right is where the money is.", filters: { live: "all" } },
 	5: { title: "Not live: turn old winners back on.", sub: "Paused ads under the scale line with 3+ purchases that aren't one-offs (promos, launches). Turn them back on.", filters: { live: "off" } },
@@ -78,11 +79,14 @@ async function loadAccounts() {
 	S.id = S.accounts.find((a) => a.id === hash)?.id ?? S.accounts[0]?.id ?? null;
 	const q = new URLSearchParams(location.search);
 	if (q.has("step") && STEPS[q.get("step")]) applyStep(Number(q.get("step")), false);
-	for (const k of ["live", "format", "stage", "y", "campaign", "adset"]) if (q.has(k)) {
-		S.filters[k] = q.get(k);
+	for (const k of ["live", "format", "stage", "y", "campaign", "adset", "ad"]) if (q.has(k)) {
+		const v = q.get(k);
+		S.filters[k] = LISTS.includes(k) ? (v === "all" ? [] : v.split(",").filter(Boolean)) : v;
 		S.step = null;
 	}
+	for (const k of LISTS) if (S.filters[k].length) S.openMulti[k] = true;
 	if (q.get("view")) S.view = q.get("view");
+	if (q.has("settings")) S.drawer = true;
 	$("#account").innerHTML = S.accounts.map((a) => `<option value="${esc(a.id)}" ${a.id === S.id ? "selected" : ""}>${esc(a.name)} · ${(PLATFORMS[a.platform] ?? PLATFORMS.meta).short} · ${a.building ? "pulling…" : `${a.ads} ads`}</option>`).join("") || `<option>No accounts yet</option>`;
 	if (S.id) await loadAccount();
 	else render();
@@ -94,6 +98,7 @@ async function loadAccount() {
 	if (location.hash !== `#${S.id}`) history.replaceState(null, "", `#${S.id}`);
 	compute();
 	render();
+	if (S.drawer) drawer();
 }
 function compute() {
 	S.result = S.data?.ads ? analyse(S.data, S.settings) : null;
@@ -154,13 +159,19 @@ const matches = (a) => {
 	if (f.live === "off" && a.live) return false;
 	if (f.format !== "all" && a.format !== f.format) return false;
 	if (f.stage !== "all" && a.stage !== f.stage) return false;
-	if (f.campaign !== "all" && a.campaignId !== f.campaign) return false;
-	if (f.adset !== "all" && a.adsetId !== f.adset) return false;
+	if (f.campaign.length && !f.campaign.includes(a.campaignId)) return false;
+	if (f.adset.length && !f.adset.includes(a.adsetId)) return false;
+	if (f.ad.length && !f.ad.includes(a.id)) return false;
 	if (f.q && !`${a.name} ${a.campaignName} ${a.adsetName}`.toLowerCase().includes(f.q)) return false;
 	return true;
 };
 const yOf = (a) => (S.filters.y === "cps" ? a.cps : a.cpa);
-const linesNow = () => (S.filters.y === "cps" ? S.result.linesSecondary : S.result.lines);
+// The lines drawn: the stage's own lines when one stage is filtered and it is graded on the metric shown.
+const linesNow = () => {
+	const r = S.result, f = S.filters, sl = f.stage !== "all" ? r.stageLines?.[f.stage] : null;
+	if (f.y === "cps") return sl?.basis === "secondary" ? sl : r.linesSecondary;
+	return sl?.basis === "primary" ? sl : r.lines;
+};
 const yName = () => (S.filters.y === "cps" ? `cost per ${CONVERSION_LABEL[S.result.secondary]}` : "CPA");
 function applyStep(n, rerender = true) {
 	const st = STEPS[n];
@@ -208,7 +219,13 @@ function renderRail() {
 	const count = (pred) => r.ads.filter(pred).length;
 	const seg = (name, opts) => `<div class="seg" role="group" aria-label="${name}">${opts.map(([v, label, n]) => `<button data-filter="${name}" data-v="${esc(v)}" aria-pressed="${f[name] === v}">${esc(label)}${n != null ? `<span class="n">${n}</span>` : ""}</button>`).join("")}</div>`;
 	const [, adsetWord] = level();
-	const campaigns = r.campaigns, adsets = r.adsets.filter((g) => f.campaign === "all" || g.campaignId === f.campaign);
+	const multi = (name, label, items, sel) => {
+		const mq = S.multiQ[name] ?? "", cap = 400;
+		return `<details class="multi" data-multi-box="${name}" ${S.openMulti[name] ? "open" : ""}><summary><span>${esc(label)}</span><b>${sel.length ? `${sel.length} of ${items.length}` : `All · ${items.length}`}</b></summary><div class="multi-list">${items.length > 8 ? `<input type="search" data-multi-q="${name}" placeholder="Type to find…" value="${esc(mq)}" autocomplete="off">` : ""}<div class="multi-items">${items.slice(0, cap).map((it) => `<label data-text="${esc(it.name.toLowerCase())}" ${mq && !it.name.toLowerCase().includes(mq) ? "hidden" : ""}><input type="checkbox" data-multi="${name}" value="${esc(it.id)}" ${sel.includes(it.id) ? "checked" : ""}><span title="${esc(it.name)}">${esc(it.name)}</span><small>${esc(it.meta ?? "")}</small></label>`).join("") || `<p class="muted small">Nothing here.</p>`}${items.length > cap ? `<p class="muted small">Showing ${cap} of ${items.length}: narrow by campaign or ${esc(adsetWord.toLowerCase())} first.</p>` : ""}</div>${sel.length ? `<button class="quiet" data-multi-clear="${name}">Every ${esc(label.toLowerCase())}</button>` : ""}</div></details>`;
+	};
+	const campaigns = r.campaigns.map((c) => ({ id: c.id, name: c.name, meta: `${c.ads}${c.live ? ` · ${c.live} live` : ""}` }));
+	const adsets = r.adsets.filter((g) => !f.campaign.length || f.campaign.includes(g.campaignId)).map((g) => ({ id: g.id, name: g.name, meta: String(g.ads) }));
+	const adItems = r.ads.filter((a) => (!f.campaign.length || f.campaign.includes(a.campaignId)) && (!f.adset.length || f.adset.includes(a.adsetId))).sort((a, b) => b.spend - a.spend).map((a) => ({ id: a.id, name: a.name, meta: money(a.spend) }));
 	rail.innerHTML = `${webPanel()}
 	<h4>The playbook</h4>
 	<div class="steps">${[0, 5, 6, 7, 8].map((n) => `<button data-step="${n}" aria-pressed="${S.step === n}"><b>${n ? `Step ${n}` : "Map"}</b>${esc(STEPS[n].title)}</button>`).join("")}</div>
@@ -216,8 +233,9 @@ function renderRail() {
 	${seg("live", [["live", "Live", count((a) => a.live)], ["off", "Not live", count((a) => !a.live)], ["all", "All", r.ads.length]])}
 	${seg("format", [["all", "All formats"], ...r.formats.filter((x) => count((a) => a.format === x)).map((x) => [x, FORMAT_LABEL[x], count((a) => a.format === x)])])}
 	${seg("stage", [["all", "All stages"], ...STAGES.filter((x) => count((a) => a.stage === x)).map((x) => [x, STAGE_LABEL[x], count((a) => a.stage === x)])])}
-	<div class="field"><label>Campaign</label><select data-filter="campaign"><option value="all">All campaigns (${campaigns.length})</option>${campaigns.map((c) => `<option value="${esc(c.id)}" ${f.campaign === c.id ? "selected" : ""}>${esc(c.name)} · ${c.ads}${c.live ? ` · ${c.live} live` : ""}</option>`).join("")}</select></div>
-	<div class="field"><label>${esc(adsetWord)}</label><select data-filter="adset"><option value="all">All ${esc(adsetWord.toLowerCase())}s (${adsets.length})</option>${adsets.map((g) => `<option value="${esc(g.id)}" ${f.adset === g.id ? "selected" : ""}>${esc(g.name)} · ${g.ads}</option>`).join("")}</select></div>
+	${multi("campaign", "Campaign", campaigns, f.campaign)}
+	${multi("adset", adsetWord, adsets, f.adset)}
+	${multi("ad", "Ad", adItems, f.ad)}
 	${r.secondary ? seg("y", [["cpa", "Y: CPA"], ["cps", `Y: cost / ${CONVERSION_LABEL[r.secondary]}`]]) : ""}
 	<div class="field"><input type="search" id="q" placeholder="Find an ad, campaign or ${esc(adsetWord.toLowerCase())}…" value="${esc(f.q)}"></div>
 	<label class="check"><input type="checkbox" data-filter="hide" ${f.hide ? "checked" : ""}> Hide ads outside the filters (not just fade them)</label>
@@ -252,12 +270,12 @@ function renderStage() {
 	const L = linesNow();
 	const off = shown.filter((a) => yOf(a) == null || yOf(a) > L.cap);
 	const title = step ? step.title : "Filtered view";
-	const sub = step ? step.sub : `${[f.live !== "all" ? (f.live === "live" ? "live" : "not live") : "", f.format !== "all" ? FORMAT_LABEL[f.format] : "", f.stage !== "all" ? STAGE_LABEL[f.stage] : "", f.campaign !== "all" ? r.campaigns.find((c) => c.id === f.campaign)?.name : "", f.adset !== "all" ? r.adsets.find((g) => g.id === f.adset)?.name : "", f.q ? `“${f.q}”` : ""].filter(Boolean).join(" · ") || "every ad on the map"}.`;
+	const sub = step ? step.sub : `${[f.live !== "all" ? (f.live === "live" ? "live" : "not live") : "", f.format !== "all" ? FORMAT_LABEL[f.format] : "", f.stage !== "all" ? STAGE_LABEL[f.stage] : "", f.campaign.map((id) => r.campaigns.find((c) => c.id === id)?.name ?? id).join(", "), f.adset.map((id) => r.adsets.find((g) => g.id === id)?.name ?? id).join(", "), f.ad.length ? `${f.ad.length} chosen ad${f.ad.length > 1 ? "s" : ""}` : "", f.q ? `“${f.q}”` : ""].filter(Boolean).join(" · ") || "every ad on the map"}.`;
 	stage.innerHTML = `
 	<div class="headline">${S.step ? `<span class="step">Step ${S.step}</span>` : ""}<h1>${esc(title)}</h1></div>
 	<p class="sub">${esc(sub)}</p>
 	<p class="stats"><b>${shown.length} ads</b> · <b>${shown.filter((a) => a.action === "kill").length} kill</b> · <b>${shown.filter((a) => a.action === "scale").length} scale</b> · <b>${shown.filter((a) => a.action === "revive").length} revive</b> · ${esc(yName())} ↑ · filled = live, hollow = not live · ${off.length} off the chart${r.hidden ? ` · ${r.hidden} ads under ${money(S.settings.minSpend)} hidden` : ""} · ${esc(S.data.account.name)} · ${esc(S.data.window.since ?? "lifetime")} → ${esc(S.data.window.until)} · live = spent in the last ${S.data.live.days} days</p>
-	<div class="chart-wrap">${renderChart(r, cur(), { y: f.y, shown: matches, hideOthers: f.hide, selected: S.selected })}${LEGEND_HTML}</div>
+	<div class="chart-wrap">${renderChart(r, cur(), { y: f.y, shown: matches, hideOthers: f.hide, selected: S.selected, lines: L })}${LEGEND_HTML}</div>
 	<div class="table-wrap">${table(shown)}</div>`;
 }
 function table(shown) {
@@ -274,6 +292,7 @@ function renderInspector() {
 	const r = S.result, a = r.ads.find((x) => x.id === S.selected);
 	const [, adsetWord] = level();
 	if (!a) return (el.innerHTML = `<h4>Lines</h4><dl class="kv"><dt>Account CPA</dt><dd>${money(r.lines.account)}</dd><dt>Target</dt><dd>${money(r.lines.target)}</dd><dt>Kill line</dt><dd>${money(r.lines.kill)}</dd><dt>Scale line</dt><dd>${money(r.lines.scale)}</dd><dt>AOV</dt><dd>${money(r.aov)}</dd><dt>Test budget</dt><dd>${money(r.testBudget)}</dd><dt>Basis</dt><dd>${r.basis === "live" ? `last ${S.data.live.days} days` : "lifetime"}</dd><dt>CPA on</dt><dd>${CONVERSION_LABEL[r.primary]}s</dd>${r.secondary ? `<dt>Secondary</dt><dd>${CONVERSION_LABEL[r.secondary]}s</dd>` : ""}</dl>
+		${Object.entries(r.stageLines).filter(([, L]) => L.custom).map(([st, L]) => `<h4>${STAGE_LABEL[st]} lines</h4><dl class="kv"><dt>Graded on</dt><dd>${L.basis === "secondary" ? `cost / ${CONVERSION_LABEL[r.secondary]}` : "CPA"}</dd><dt>Target</dt><dd>${money(L.target)}</dd><dt>Kill line</dt><dd>${money(L.kill)}</dd><dt>Scale line</dt><dd>${money(L.scale)}</dd></dl>`).join("")}
 		<h4>Counts</h4><dl class="kv">${Object.entries(r.counts).map(([k, v]) => `<dt>${ACTION_LABEL[k]}</dt><dd>${v}</dd>`).join("")}</dl>
 		<p class="muted small">Click a dot or a row to see its numbers, fix its format or stage, or call it by hand. Filled dots are live; hollow ones haven't spent in ${S.data.live.days} days.</p>`);
 	const sel = (name, opts, curv) => `<select data-tag="${name}" ${S.app.canEdit ? "" : "disabled"}>${opts.map(([v, l]) => `<option value="${v}" ${v === curv ? "selected" : ""}>${l}</option>`).join("")}</select>`;
@@ -319,14 +338,15 @@ function drawer() {
 	const d = $("#drawer");
 	d.hidden = !S.drawer;
 	if (!S.drawer || !S.result) return;
-	const s = S.settings, r = S.result;
+	const r = S.result, s = r.settings; // normalized: stored settings may predate newer keys
 	const row = (label, help, input) => `<div class="row"><div>${label}<small>${help}</small></div>${input}</div>`;
 	const numf = (key, step = 1, scale = 1) => `<input type="number" step="${step}" data-set="${key}" data-scale="${scale}" value="${+(s[key] * scale).toFixed(4)}">`;
 	const selectf = (key, opts) => `<select data-set="${key}">${opts.map(([v, l]) => `<option value="${v}" ${String(s[key]) === String(v) ? "selected" : ""}>${l}</option>`).join("")}</select>`;
 	d.innerHTML = `<button class="close" data-act="settings">Close</button><h2>Lines & thresholds</h2><p class="help">Everything recomputes as you type and is saved to the account's settings, where Claude can read and edit it too.</p>
 	<h4>Lines</h4>
 	${row("Account CPA basis", `Current blended CPA: ${money(r.lines.account)}`, selectf("cpaBasis", [["live", `Last ${S.data.live.days} days`], ["lifetime", "Lifetime"]]))}
-	${row("Target: % under account CPA", `Target ${money(r.lines.target)}`, numf("targetPct", 1, 100))}
+	${row("Target", `Target ${money(r.lines.target)}`, selectf("targetMode", [["pct", "% under account CPA"], ["cpa", "A fixed CPA"]]))}
+	${s.targetMode === "cpa" ? row("Target CPA", `On ${CONVERSION_LABEL[r.primary]}s; the kill and scale lines multiply it`, numf("targetCpa", 1)) : row("Target: % under account CPA", `Target ${money(r.lines.target)}`, numf("targetPct", 1, 100))}
 	${row("Kill line: × target", money(r.lines.kill), numf("killMult", 0.1))}
 	${row("Scale line: × target", money(r.lines.scale), numf("scaleMult", 0.05))}
 	${row("Chart top: × target", "Ads above this go in the off-chart strip", numf("capMult", 0.5))}
@@ -340,15 +360,35 @@ function drawer() {
 	${row("Secondary (TOF metric)", `Auto picks ${CONVERSION_LABEL[r.secondary] ?? "nothing"}`, selectf("secondary", [["", "Auto"], ...CONVERSIONS.map((c) => [c, CONVERSION_LABEL[c]])]))}
 	${row("Grade TOF on the secondary", "Step 8: TOF ads judged on cost per secondary conversion", selectf("gradeTofBySecondary", [["false", "No"], ["true", "Yes"]]))}
 	${row("Live window (days)", "Changing this needs a rebuild: use Refresh", `<input type="number" value="${s.liveDays}" disabled>`)}
+	<h4>Goals by stage</h4><p class="help">Each stage can be graded on its own conversion and its own target; kill and scale lines multiply that target. 0 keeps the account lines.</p>
+	${["tof", "mof", "bof"].map((st) => { const cfg = s.stages[st], L = r.stageLines[st]; return row(`${STAGE_LABEL[st]}: graded on`, `Target ${money(L.target)} · kill ${money(L.kill)} · scale ${money(L.scale)}${L.basis === "secondary" ? ` per ${CONVERSION_LABEL[r.secondary]}` : ""}`, `<select data-stage-set="${st}.basis"><option value="" ${!cfg.basis ? "selected" : ""}>Auto (${st === "tof" && s.gradeTofBySecondary && r.secondary ? CONVERSION_LABEL[r.secondary] : "CPA"})</option><option value="primary" ${cfg.basis === "primary" ? "selected" : ""}>CPA on ${CONVERSION_LABEL[r.primary]}s</option>${r.secondary ? `<option value="secondary" ${cfg.basis === "secondary" ? "selected" : ""}>Cost per ${CONVERSION_LABEL[r.secondary]}</option>` : ""}</select>`) + row(`${STAGE_LABEL[st]}: target`, "0 = from the account lines", `<input type="number" step="1" min="0" data-stage-set="${st}.target" value="${cfg.target}">`); }).join("")}
+	<h4>Campaign stages</h4><p class="help">Stages come from names: TOF for prospecting, cold, lookalike, broad, non-brand; MOF for retargeting, engaged, conquest; BOF for cart, checkout, brand, past buyers. Set a campaign here when the names mislead; one ad's stage can still be changed in the inspector.</p>
+	<table class="camp-stages"><thead><tr><th>Campaign</th><th class="num">Ads</th><th>Tagged</th><th>Stage</th></tr></thead><tbody>${r.campaigns.map((c) => `<tr><td title="${esc(c.name)}">${esc(c.name)}</td><td class="num">${c.ads}</td><td>${STAGE_LABEL[c.autoStage] ?? c.autoStage}</td><td><select data-camp-stage="${esc(c.id)}"><option value="" ${!s.campaignStages[c.id] ? "selected" : ""}>Auto</option>${STAGES.map((st) => `<option value="${st}" ${s.campaignStages[c.id] === st ? "selected" : ""}>${STAGE_LABEL[st]}</option>`).join("")}</select></td></tr>`).join("")}</tbody></table>
 	<h4>Notes for the exports</h4><textarea data-set="notes" rows="4" placeholder="Context the readout should carry: offers, seasonality, what changed.">${esc(s.notes)}</textarea>`;
 }
 
 // --- Events ---
 document.addEventListener("click", (e) => {
-	const t = e.target.closest("[data-filter],[data-step],[data-id],[data-ask],[data-decide],[data-act],[data-sort],[data-view],#toggleLeft,#toggleRight,#settingsBtn,#exportBtn,#refreshBtn");
+	const t = e.target.closest("[data-multi],[data-multi-clear],[data-filter],[data-step],[data-id],[data-ask],[data-decide],[data-act],[data-sort],[data-view],#toggleLeft,#toggleRight,#settingsBtn,#exportBtn,#refreshBtn");
 	if (!t) {
 		if (!e.target.closest("#exportMenu")) $("#exportMenu").hidden = true;
 		return;
+	}
+	if (t.dataset.multi) {
+		const k = t.dataset.multi, set = new Set(S.filters[k]);
+		t.checked ? set.add(t.value) : set.delete(t.value);
+		S.filters[k] = [...set];
+		const inScope = (a) => (!S.filters.campaign.length || S.filters.campaign.includes(a.campaignId)) && (!S.filters.adset.length || S.filters.adset.includes(a.adsetId));
+		if (k === "campaign") S.filters.adset = S.filters.adset.filter((id) => S.result.adsets.some((g) => g.id === id && (!set.size || set.has(g.campaignId))));
+		if (k !== "ad") S.filters.ad = S.filters.ad.filter((id) => S.result.ads.some((a) => a.id === id && inScope(a)));
+		S.step = null;
+		return render();
+	}
+	if (t.dataset.multiClear) {
+		S.filters[t.dataset.multiClear] = [];
+		if (t.dataset.multiClear === "campaign") S.filters.adset = [];
+		S.step = null;
+		return render();
 	}
 	if (t.dataset.filter && t.tagName === "BUTTON") {
 		S.filters[t.dataset.filter] = t.dataset.v;
@@ -437,8 +477,9 @@ document.addEventListener("click", (e) => {
 		e.preventDefault();
 		const a = S.result.ads.find((x) => x.id === S.selected);
 		if (!a) return;
-		S.filters.campaign = a.campaignId;
-		S.filters.adset = t.dataset.act === "focus-adset" ? a.adsetId : "all";
+		S.filters.campaign = [a.campaignId];
+		S.filters.adset = t.dataset.act === "focus-adset" ? [a.adsetId] : [];
+		S.filters.ad = [];
 		S.filters.live = "all";
 		S.step = null;
 		S.view = "map";
@@ -483,11 +524,23 @@ document.addEventListener("change", (e) => {
 	}
 	if (t.dataset.filter) {
 		S.filters[t.dataset.filter] = t.type === "checkbox" ? t.checked : t.value;
-		if (t.dataset.filter === "campaign") S.filters.adset = "all";
 		if (t.dataset.filter !== "hide") S.step = null;
 		return render();
 	}
 	if (t.dataset.tag && S.selected) return setOverride(S.selected, { [t.dataset.tag]: t.type === "checkbox" ? t.checked : t.value });
+	if (t.dataset.stageSet) {
+		const [st, key] = t.dataset.stageSet.split(".");
+		const cur = S.result.settings.stages;
+		saveSettings({ stages: { ...cur, [st]: { ...cur[st], [key]: key === "target" ? Number(t.value) : t.value } } });
+		return drawer();
+	}
+	if (t.dataset.campStage != null) {
+		const campaignStages = { ...S.settings.campaignStages };
+		if (t.value) campaignStages[t.dataset.campStage] = t.value;
+		else delete campaignStages[t.dataset.campStage];
+		saveSettings({ campaignStages });
+		return drawer();
+	}
 	if (t.dataset.set) {
 		let v = t.value;
 		if (t.type === "number") v = Number(v) / Number(t.dataset.scale || 1);
@@ -496,7 +549,15 @@ document.addEventListener("change", (e) => {
 		return drawer();
 	}
 });
+document.addEventListener("toggle", (e) => {
+	if (e.target.matches?.("details[data-multi-box]")) S.openMulti[e.target.dataset.multiBox] = e.target.open;
+}, true);
 document.addEventListener("input", (e) => {
+	if (e.target.dataset?.multiQ) {
+		const q = (S.multiQ[e.target.dataset.multiQ] = e.target.value.trim().toLowerCase());
+		for (const l of e.target.parentElement.querySelectorAll("label[data-text]")) l.hidden = !!q && !l.dataset.text.includes(q);
+		return;
+	}
 	if (e.target.id === "q") {
 		S.filters.q = e.target.value.trim().toLowerCase();
 		S.step = null;

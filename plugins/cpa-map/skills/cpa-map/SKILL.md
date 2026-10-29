@@ -26,7 +26,10 @@ BOF from campaign tags and ad names), campaign, ad set, Y axis CPA or cost per a
 - **Step 8, stage:** grade TOF on cost per add-to-cart (or sign-up / lead), BOF on CPA.
 
 The rules live in `studio/model.mjs` (`analyse`). Manual calls in `settings.decisions` beat the rules; `settings.overrides`
-fix an ad's `format`, `stage` or `oneOff`; `settings.notes` is free text the exports carry.
+fix an ad's `format`, `stage` or `oneOff`; `settings.campaignStages` (campaign id → tof / mof / bof) sets a whole campaign's
+stage over the name tags; `settings.targetMode` ("pct" | "cpa") with `targetCpa` fixes the target; `settings.stages.<tof|mof|bof>`
+holds `{ basis: "" | "primary" | "secondary", target }` so each stage can be graded on its own conversion and target
+(`result.stageLines` carries the lines in force); `settings.notes` is free text the exports carry.
 
 ## Pull: get an account's ads from BlueAlpha
 
