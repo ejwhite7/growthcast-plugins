@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 — 2026-10-29
+
+- Google Ads: GAQL rows in camelCase (the REST JSON Composio returns) are read the same as snake_case rows. Before, hosted pulls through Composio built every ad with zero spend.
+
 ## 0.2.1 — 2026-10-29
 
 - Web mode: when a connection can't list its ad accounts (for example a Meta system-user token without `ads_read`), the picker shows the platform's refusal and lets staff enter an account id directly.

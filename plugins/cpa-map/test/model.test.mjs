@@ -136,3 +136,17 @@ test("narrative, report and slides render from the analysis", () => {
 	assert.equal((deck.match(/class="slide[ "]/g) || []).length, 10);
 	assert.match(deck, /Turn 1 paused winner back on/);
 });
+
+test("buildGoogle: camelCase REST rows (Composio) read the same as snake_case rows", () => {
+	const camel = (v) => (Array.isArray(v) ? v.map(camel) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k.replace(/_([a-z])/g, (_, c) => c.toUpperCase()), camel(x)])) : v);
+	const lifetime = [{ campaign: { id: "1", name: "Brand", advertising_channel_type: "SEARCH", status: "ENABLED" }, ad_group: { id: "10", name: "Exact" }, ad_group_ad: { ad: { id: "100", name: "", type: "RESPONSIVE_SEARCH_AD" }, status: "ENABLED" }, metrics: { cost_micros: "250000000", impressions: "1000", clicks: "50", conversions: 5, conversions_value: 500, all_conversions: 5 } }];
+	const live = [{ ad_group_ad: { ad: { id: "100" } }, campaign: { id: "1" }, ad_group: { id: "10" }, metrics: { cost_micros: "100000000", impressions: "400", clicks: "20", conversions: 2, conversions_value: 200 } }];
+	const a = buildGoogle({ account: { id: "gads_1", name: "G", currency: "USD" }, lifetime, live, today: "2026-10-29" }).ads[0];
+	const b = buildGoogle({ account: { id: "gads_1", name: "G", currency: "USD" }, lifetime: camel(lifetime), live: camel(live), today: "2026-10-29" }).ads[0];
+	assert.equal(a.spend, 250);
+	assert.equal(b.spend, 250);
+	assert.equal(b.spendLive, 100);
+	assert.equal(b.adsetName, "Exact");
+	assert.equal(b.format, a.format);
+	assert.equal(b.status, "ENABLED");
+});

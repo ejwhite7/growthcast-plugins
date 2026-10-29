@@ -176,7 +176,10 @@ export function buildMeta({ account, lifetime, live, last7 = [], campaigns = [],
 // --- Google Ads ---
 // Conversion action categories folded into the map's buckets. Everything else stays in "conversion" only.
 const GOOGLE_CATEGORY = { PURCHASE: "purchase", ADD_TO_CART: "add_to_cart", BEGIN_CHECKOUT: "initiate_checkout", SIGNUP: "complete_registration", SUBSCRIBE_PAID: "purchase", LEAD: "lead", SUBMIT_LEAD_FORM: "lead", BOOK_APPOINTMENT: "lead", REQUEST_QUOTE: "lead", CONTACT: "lead", PHONE_CALL_LEAD: "lead", IMPORTED_LEAD: "lead", QUALIFIED_LEAD: "lead", CONVERTED_LEAD: "lead", GET_DIRECTIONS: "lead" };
-const gid = (r, path) => path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), r);
+// GAQL rows come snake_case from the Google Ads client libraries and camelCase from the REST JSON (Composio), so each
+// segment is tried both ways: metrics.cost_micros also reads metrics.costMicros.
+const camel = (k) => k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+const gid = (r, path) => path.split(".").reduce((o, k) => (o == null ? undefined : o[k] !== undefined ? o[k] : o[camel(k)]), r);
 const adKey = (r) => String(gid(r, "ad_group_ad.ad.id") ?? gid(r, "adGroupAd.ad.id") ?? "");
 // One record per ad from GAQL rows: lifetime (no date clause), live window, last 7 days, conversions by action
 // category, campaigns, and the customer row. Money is in micros.
