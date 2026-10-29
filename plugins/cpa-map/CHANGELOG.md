@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3 — 2026-10-29
+
+- Web mode: DELETE calls (disconnect a platform, dismiss a request) carry the JSON content type the portal proxy requires.
+
 ## 0.2.2 — 2026-10-29
 
 - Google Ads: GAQL rows in camelCase (the REST JSON Composio returns) are read the same as snake_case rows. Before, hosted pulls through Composio built every ad with zero spend.

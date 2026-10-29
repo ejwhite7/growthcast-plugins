@@ -17,8 +17,10 @@ const STEPS = {
 	8: { title: "Stage: grade each stage on its own metric.", sub: "TOF on cost per add-to-cart (or sign-up): a top-of-funnel ad with a bad CPA and cheap carts is doing its job. BOF on CPA.", filters: { live: "live", stage: "tof", y: "cps" }, settings: { gradeTofBySecondary: true } },
 };
 
-const api = async (path, opts) => {
-	const r = await fetch(path, { cache: "no-store", ...opts });
+const api = async (path, opts = {}) => {
+	// Every write is JSON, including bodiless DELETEs: the portal proxy refuses writes without the content type.
+	const headers = opts.method && opts.method !== "GET" ? { "content-type": "application/json", ...(opts.headers ?? {}) } : opts.headers;
+	const r = await fetch(path, { cache: "no-store", ...opts, headers });
 	if (!r.ok) {
 		let msg = await r.text();
 		try {
